@@ -1,0 +1,98 @@
+{
+	"name": "iPSCTissueBankWu",
+
+	"namespace": "Stanford\\iPSCTissueBankWu",
+
+	"description": "This is a specialized module for Wu iPSC Tissue Bank",
+
+	"documentation": "README.md",
+
+	"authors": [
+		{
+			"name": "Eileen Loh",
+			"email": "eloh@stanford.edu",
+			"institution": "Stanford School of Medicine"
+		}
+	],
+
+	"permissions": [
+		"redcap_every_page_before_render",
+		"redcap_data_entry_form_top",
+		"redcap_survey_page_top",
+		"redcap_save_record"
+	],
+
+	"enable-every-page-hooks-on-system-pages": false,
+
+	"links": {
+		"project": [
+
+			{
+				"name": "Planned Report",
+				"icon": "gear",
+				"url": "Pages/planned_report.php",
+				"show-header-and-footer": true
+			},
+			{
+				"name": "Empty Slot Report",
+				"icon": "gear",
+				"url": "Pages/empty_slot_report.php",
+				"show-header-and-footer": true
+			},
+			{
+				"name": "Moved Report",
+				"icon": "gear",
+				"url": "Pages/moved_report.php",
+				"show-header-and-footer": true
+			},
+			{
+				"name": "Zebra Sample Print",
+				"icon": "gear",
+				"url": "zebra-browser-print-js-v30216/sample/sample.php"
+			},
+			{
+				"name": "Zebra Print Documentation",
+				"icon": "gear",
+				"url": "zebra-browser-print-js-v30216/Documentation/index.html"
+			}
+
+		],
+		"control-center": [
+
+		]
+	},
+
+	"no-auth-pages": [
+
+	],
+
+	"system-settings": [
+		{
+			"key": "enable-system-debug-logging",
+			"name": "<b>Enable Debug Logging (system-wide)</b><i>(optional)</i> Requires installation and configuration of emLogger",
+			"required": false,
+			"type": "checkbox"
+		}
+
+	],
+
+	"project-settings": [
+		{
+			"key": "enable-project-debug-logging",
+			"name": "<b>Enable Debug Logging</b><br><i>(optional)</i> Requires installation and configuration of emLogger",
+			"required": false,
+			"type": "checkbox"
+		}
+	],
+
+	"crons": [
+
+	],
+
+	"compatibility": {
+		"php-version-min": "",
+		"php-version-max": "",
+		"redcap-version-min": "",
+		"redcap-version-max": ""
+	}
+}
