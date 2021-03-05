@@ -24,15 +24,21 @@ try {
      * Run the SQL corresponding to the user supplied spec
      */
 
-    function getRecordIds() {
+    function getRecordIds(): array
+    {
         global $module;
         $matches = [];
-        preg_match_all(
+        /*preg_match_all(
             "/editInstance\((?P<record>.*?),(?P<event_id>.*?),(?P<instrument>.*?),(?P<instance>.*?)\)/",
-        $_POST['tablehtml'], $matches);
+        $_POST['tablehtml'], $matches);*/
+        preg_match_all(
+            "/editInstance\((?P<record>.*?),(?P<event_id>.*?),(?P<instrument>.*?),(?P<instance>.*?)\).*?<td>.(?P<vialid>.*?)<\/td><td>(?P<box>.*?)<\/td><td>(?P<slot>.*?)<\/td><\/tr>/",
+            $_POST['tablehtml'], $matches);
         $module->emDebug('matches: ' . print_r($matches, true));
         return $matches;
     }
+
+
 
     function cancelPlanned($record, $instances) {
         global $module;
@@ -79,7 +85,7 @@ try {
         global $module;
 
         $sql="select distinct COALESCE (sample.red_rec_number,'') `record`, 
-            COALESCE (vial.vial_id,'') `instance`, 
+            COALESCE (sample.sample_instance,'') `instance`, 
             COALESCE (sample.smp_date_deposited,'') `sample_date`, 
             COALESCE (sample.smp_line_id,'') `line`, 
             
@@ -135,66 +141,6 @@ try {
        " GROUP BY rd.record, vial_instance) t    
         WHERE vial_dist_status = '1' ) vial 
         ON sample.red_rec_number=vial.red_rec_number AND vial_sample_ref = sample_instance )";
-
-
-
-        /*$sql = "SELECT DISTINCT dist_status.record AS record, dist_status.instance as instance,".
-            "sample_date.value AS sample_date, sample_line.value AS line,".
-            "substring(md.element_enum, instr(md.element_enum, smp_type.value) + length(smp_type.value) + 2,".
-         "locate('\\\\n',md.element_enum,instr(md.element_enum, smp_type.value) + length(smp_type.value))".
-          "-(instr(md.element_enum, smp_type.value) + length(smp_type.value) + 2)) as type,".
-            " passage.value AS passage, vialid.value AS vial_id,".
-            "box.value AS freezer_box, slot.value AS freezer_slot, dist_by.value AS dist_by,".
-            "dist_to.value AS dist_to, dist_date.value AS dist_date ".
-            "FROM redcap_data dist_status ".
-            "JOIN redcap_data vialid ON dist_status.project_id = vialid.project_id ".
-            "AND dist_status.record = vialid.record AND dist_status.event_id = vialid.event_id ".
-            "AND vialid.field_name = 'vial_id' ".
-            "AND COALESCE(dist_status.instance, 1) = COALESCE(vialid.instance, 1) ".
-            "JOIN redcap_data box ON dist_status.project_id = box.project_id ".
-            "AND dist_status.event_id = box.event_id AND dist_status.record = box.record ".
-            "AND COALESCE(dist_status.instance, 1) = COALESCE(box.instance, 1) ".
-            "AND box.field_name = 'vial_freezer_box' ".
-            "JOIN redcap_data slot ON dist_status.project_id = slot.project_id ".
-            "AND dist_status.event_id = slot.event_id AND dist_status.record = slot.record ".
-            "AND COALESCE(dist_status.instance, 1) = COALESCE(slot.instance, 1) ".
-            "AND slot.field_name = 'vial_freezer_slot' ".
-            "JOIN redcap_data dist_to ON dist_status.project_id = dist_to.project_id ".
-            "AND dist_status.event_id = dist_to.event_id AND dist_status.record = dist_to.record ".
-            "AND COALESCE(dist_status.instance, 1) = COALESCE(dist_to.instance, 1) ".
-            "AND dist_to.field_name = 'vial_dist_to' ".
-            "JOIN redcap_data dist_by ON dist_status.project_id = dist_by.project_id ".
-            "AND dist_status.event_id = dist_by.event_id AND dist_status.record = dist_by.record ".
-            "AND COALESCE(dist_status.instance, 1) = COALESCE(dist_by.instance, 1) ".
-            "AND dist_by.field_name = 'vial_dist_by' ".
-            "JOIN redcap_data dist_date ON dist_status.project_id = dist_date.project_id ".
-            "AND dist_status.event_id = dist_date.event_id AND dist_status.record = dist_date.record ".
-            "AND COALESCE(dist_status.instance, 1) = COALESCE(dist_date.instance, 1) ".
-            "AND dist_date.field_name = 'vial_dist_date' ".
-            "JOIN redcap_data smp_ref ON dist_status.project_id = smp_ref.project_id ".
-            "AND dist_status.event_id = smp_ref.event_id AND dist_status.record = smp_ref.record ".
-            "AND COALESCE(dist_status.instance, 1) = COALESCE(smp_ref.instance, 1) ".
-            "AND smp_ref.field_name = 'vial_sample_ref' ".
-            "JOIN redcap_data sample_date ON dist_status.project_id = sample_date.project_id ".
-            "AND dist_status.record = sample_date.record AND dist_status.event_id = sample_date.event_id ".
-            "AND COALESCE(sample_date.instance, 1) = COALESCE(smp_ref.value, 1) ".
-            "AND sample_date.field_name = 'smp_date_deposited' ".
-            "JOIN redcap_data sample_line ON dist_status.project_id = sample_line.project_id ".
-            "AND dist_status.record = sample_line.record AND dist_status.event_id = sample_line.event_id " .
-            "AND COALESCE(sample_line.instance, 1) = COALESCE(smp_ref.value, 1) ".
-            "AND sample_line.field_name = 'smp_line_id' ".
-            "JOIN redcap_data smp_type ON dist_status.project_id = smp_type.project_id ".
-            "AND dist_status.record = smp_type.record AND dist_status.event_id = smp_type.event_id ".
-            "AND COALESCE(smp_type.instance, 1) = COALESCE(smp_ref.value, 1) ".
-            "AND smp_type.field_name = 'smp_type' ".
-            'JOIN redcap_metadata md ON md.project_id=smp_type.project_id '.
-           'AND md.field_name=smp_type.field_name '.
-            "JOIN redcap_data passage ON dist_status.project_id = passage.project_id ".
-            "AND dist_status.record = passage.record AND dist_status.event_id = passage.event_id ".
-            "AND COALESCE(passage.instance, 1) = COALESCE(smp_ref.value, 1) ".
-            "AND passage.field_name = 'smp_passage_number' ".
-            "WHERE dist_status.project_id = ".PROJECT_ID.
-            " AND dist_status.field_name = 'vial_dist_status' AND dist_status.value = '1'";*/
 
         $result = db_query($sql);
         $returnData = [];
@@ -312,6 +258,82 @@ try {
         } else {
             echo '{"success":true}';
         }
+    } else if ($_POST['updateType'] == 'print') {
+        $matches = getRecordIds();
+        $sql="select distinct COALESCE (sample.red_rec_number,'') `record`, 
+            COALESCE (sample.sample_instance,'') `instance`, 
+            COALESCE (sample.smp_date_deposited,'') `sample_date`, 
+            COALESCE (sample.smp_line_id,'') `line`, 
+            COALESCE (sample.smp_type,'') `type`, 
+            COALESCE (sample.smp_passage_number,'') `passage`, 
+            COALESCE (vial.vial_id,'') `vial_id`, 
+            COALESCE (vial.vial_freezer_box,'') `freezer_box`, 
+            COALESCE (vial.vial_freezer_slot,'') `freezer_slot`
+        FROM ((select * from (select rd.record  red_rec_number ,
+            COALESCE(rd.`instance`, 1) as sample_instance,
+            group_concat(distinct case when rd.field_name = 'smp_type' then 
+                substring(md.element_enum, instr(md.element_enum, rd.value) + length(rd.value) + 2,
+            locate('\\\\n',
+                md.element_enum,
+                instr(md.element_enum, rd.value) + length(rd.value))-(instr(md.element_enum, rd.value) + length(rd.value) + 2)) end separator '\\n') as `smp_type`,                         
+            group_concat(distinct case when rd.field_name = 'smp_date_deposited' 
+                then rd.value end separator '\\n') `smp_date_deposited`, 
+            group_concat(distinct case when rd.field_name = 'smp_passage_number'  
+                then rd.value end separator '\\n') `smp_passage_number`, 
+            group_concat(distinct case when rd.field_name = 'smp_line_id'  
+                then rd.value end separator '\\n') `smp_line_id`
+      FROM redcap_data rd JOIN redcap_metadata md 
+          ON md.project_id = rd.project_id 
+             AND md.field_name = rd.field_name AND md.form_name='sample'
+      WHERE rd.project_id = ".PROJECT_ID.
+            " AND rd.record = " . $matches['record'][0] .
+            " GROUP BY rd.record, sample_instance) t   ) sample INNER JOIN
+        (select * from (select rd.record  red_rec_number ,
+        COALESCE(rd.`instance`, 1) as vial_instance,
+        group_concat(distinct case when rd.field_name = 'vial_sample_ref'  
+            then rd.value end separator '\\n') `vial_sample_ref`, 
+        group_concat(distinct case when rd.field_name = 'vial_id'  
+            then rd.value end separator '\\n') `vial_id`, 
+        group_concat(distinct case when rd.field_name = 'vial_freezer_box'  
+            then rd.value end separator '\\n') `vial_freezer_box`, 
+        group_concat(distinct case when rd.field_name = 'vial_freezer_slot'  
+            then rd.value end separator '\\n') `vial_freezer_slot`
+      FROM redcap_data rd
+      WHERE rd.project_id = ".PROJECT_ID.
+            " AND rd.record = " . $matches['record'][0] .
+            " AND rd.instance in (" . implode(",", $matches['instance']).")".
+            " GROUP BY rd.record, vial_instance) t ) vial 
+        ON sample.red_rec_number=vial.red_rec_number AND vial_sample_ref = sample_instance )";
+        $module->emDebug("print query sql: " .$sql);
+
+        $result = db_query($sql);
+        $module->emDebug("print query results: " . print_r($result, true));
+
+        $print_data='';
+        while ($row = db_fetch_assoc($result)) {
+            $module->emDebug('row ' . print_r($row, true));
+            $print_data.="^XA^FO10,12^ADN,18,10^FD".$row['sample_date']."^FS";
+            $print_data.="^FO10,29^ADN,18,10^FDEXID ".$row['record']."^FS";
+            $print_data.="^FO10,46^ADN,18,10^FD".$row['freezer_box']."-".$row['freezer_slot']."^FS";
+            $print_data.="^FO10,63^ADN,18,10^FD".trim($row['type'])." ".$row['line']
+                ." ".$row['passage']."^FS";
+            $print_data.="^FO10,80^ADN,18,10^FD".$row['vialid']."^FS";
+            $print_data.="^FO10,97^BY3^BCN,50,N,N,N,A^FD".$row['vialid']."^FS";
+            $print_data.="^XZ";
+        }
+        $module->emDebug("ZPL:" . $print_data);
+        try
+        {
+            $fp=pfsockopen($module->getProjectSetting('printer-ip'),9100);
+            fputs($fp,$print_data);
+            fclose($fp);
+
+            echo 'Successfully Printed';
+        }
+        catch (Exception $e)
+        {
+            echo 'Caught printing exception: ',  $e->getMessage(), "\n";
+        }
     } else if ($_POST['updateType'] == 'emptySlotReport') {
         $freezer=$_POST['freezer'];
         $module->emDebug('emptySlotReport');
@@ -367,10 +389,8 @@ try {
         $module->emDebug('moveReport');
 
         $sql="select distinct COALESCE (sample.red_rec_number,'') `record`, 
-            /*COALESCE (vial.vial_id,'') `instance`, */
             COALESCE (sample.smp_date_deposited,'') `deposit_date`, 
             COALESCE (sample.smp_line_id,'') `line`, 
-            /*COALESCE (sample.smp_type,'') `type`, */
             COALESCE (vial.vial_id,'') `vial_id`, 
             COALESCE (vial.vial_prev_freezer_box,'') `prev_box`, 
             COALESCE (vial.vial_prev_freezer_slot,'') `prev_slot`,
@@ -379,12 +399,7 @@ try {
             COALESCE (vial.vial_move_date,'') `move_date` 
 
         FROM ((select * from (select rd.record  red_rec_number ,
-            COALESCE(rd.`instance`, 1) as sample_instance,
-            /*group_concat(distinct case when rd.field_name = 'smp_type' then 
-                substring(md.element_enum, instr(md.element_enum, rd.value) + length(rd.value) + 2,
-            locate('\\\\n',
-                md.element_enum,
-                instr(md.element_enum, rd.value) + length(rd.value))-(instr(md.element_enum, rd.value) + length(rd.value) + 2)) end separator '\\n') as `smp_type`,  */                       
+            COALESCE(rd.`instance`, 1) as sample_instance,                     
             group_concat(distinct case when rd.field_name = 'smp_date_deposited' 
                 then rd.value end separator '\\n') `smp_date_deposited`, 
             group_concat(distinct case when rd.field_name = 'smp_line_id'  
@@ -418,52 +433,6 @@ try {
         WHERE vial_dist_status <> '2' AND vial_prev_freezer_box <> '' ) vial 
         ON sample.red_rec_number=vial.red_rec_number AND vial_sample_ref = sample_instance )";
 
-        /*$sql = "select prevbox.record as record,  sample_date.value as deposit_date, sample_line.value as line, ".
-            "vialid.value as vial_id, prevbox.value as prev_box, prevslot.value as prev_slot, ".
-            "box.value as box, slot.value as slot, move_date.value as move_date " .
-            "from redcap_data prevbox ".
-            "join redcap_data prevslot on prevbox.project_id = prevslot.project_id " .
-            "and prevbox.event_id = prevslot.event_id ".
-            "and prevbox.record = prevslot.record and coalesce(prevbox.instance,1) = coalesce(prevslot.instance,1) " .
-            "join redcap_data vialid on prevbox.project_id = vialid.project_id " .
-            "and prevbox.event_id = vialid.event_id ".
-            "and prevbox.record = vialid.record and coalesce(prevbox.instance,1) = coalesce(vialid.instance,1) ".
-            "join redcap_data box on prevbox.project_id = box.project_id " .
-            "and prevbox.event_id = box.event_id ".
-            "and prevbox.record = box.record and coalesce(prevbox.instance,1) = coalesce(box.instance,1) ".
-            "join redcap_data slot on prevbox.project_id = slot.project_id " .
-            "and prevbox.event_id = slot.event_id ".
-            "and prevbox.record = slot.record and coalesce(prevbox.instance,1) = coalesce(slot.instance,1) " .
-            "join redcap_data dist on prevbox.project_id = dist.project_id " .
-            "and prevbox.record = dist.record and coalesce(prevbox.instance,1) = coalesce(dist.instance,1) " .
-
-            "JOIN redcap_data smp_ref ON prevbox.project_id = smp_ref.project_id ".
-            "AND prevbox.event_id = smp_ref.event_id AND prevbox.record = smp_ref.record ".
-            "AND COALESCE(prevbox.instance, 1) = COALESCE(smp_ref.instance, 1) ".
-            "AND smp_ref.field_name = 'vial_sample_ref' ".
-
-            "JOIN redcap_data sample_date ON prevbox.project_id = sample_date.project_id ".
-            "AND prevbox.record = sample_date.record AND prevbox.event_id = sample_date.event_id ".
-            "AND COALESCE(sample_date.instance, 1) = COALESCE(smp_ref.value, 1) ".
-            "AND sample_date.field_name = 'smp_date_deposited' ".
-
-            "JOIN redcap_data sample_line ON prevbox.project_id = sample_line.project_id ".
-            "AND prevbox.record = sample_line.record AND prevbox.event_id = sample_line.event_id " .
-            "AND COALESCE(sample_line.instance, 1) = COALESCE(smp_ref.value, 1) ".
-            "AND sample_line.field_name = 'smp_line_id' ".
-
-            "left join redcap_data move_date on prevbox.project_id = move_date.project_id " .
-            "and prevbox.event_id = move_date.event_id ".
-            "and move_date.field_name = 'vial_move_date' ".
-            "and prevbox.record = move_date.record and coalesce(prevbox.instance,1) = coalesce(move_date.instance,1) " .
-            " where prevbox.project_id = " . PROJECT_ID .
-            " and prevbox.field_name='vial_prev_freezer_box'" .
-            " and prevslot.field_name='vial_prev_freezer_slot'" .
-            " and vialid.field_name='vial_id'" .
-            " and box.field_name='vial_freezer_box'" .
-            " and slot.field_name='vial_freezer_slot'" .
-            " and dist.field_name='vial_dist_status'" .
-            " and dist.value in ('0','1')";*/
         $result = db_query($sql);
         $module->emDebug('$sql ' . $sql);
 

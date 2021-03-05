@@ -622,6 +622,28 @@ and TABLE_TYPE='VIEW'";*/
                 'Distribute');            },
             reprintInstances: function (record, event, form, tableId) {
               let selectedTable = displaySelected(tableId);
+              simpleDialog('<div style=&quot;margin-top:15px;color:#c00000;font-weight:bold;&quot;>' +
+                'Print labels for these vials?' +
+                '</div> <table class="table table-striped table-bordered table-condensed">' + selectedTable.html() + '</table>',
+                'PRINT', null, 600, null,
+                'Close',
+                function () {
+                  $.ajax({
+                    url: update_vials_url,
+                    timeout: 60000000,
+                    type: 'POST',
+                    data: {"updateType":"print", "tablehtml": '"'+selectedTable.find('tbody').html()+'"'},
+                    dataType: 'json',
+                    success: function (response) {
+                      console.log(response);
+                    },
+                    error: function (request, error) {
+                      console.log(request);
+                      console.log(error);
+                    }
+                  });
+                },
+                'Print');
             },
             moveInstances: function (record, event, form, tableId) {
               let selectedTable = displaySelected(tableId);
@@ -755,13 +777,14 @@ and TABLE_TYPE='VIEW'";*/
                 '.deleteInstances(\'' . $this->record . '\',' . $eventId . ',\'' . $formName . '\',\'' .
                 $tableElementId . '\');" disabled><span class="fas fa-times-circle" aria-hidden="true"></span>&nbsp;' . $this->lang['global_19'] . '</button>';// Delete records
             $html .= '<button type="button" id="frozenDistributeButton"
-            class="btn btn-sm btn-info mr-2 ' . $tableElementId . '_btn" onclick="' . self::MODULE_VARNAME . '.distributeInstances(\'' .
+            class="btn btn-sm btn-info mr-2 ' . $tableElementId . '_btn" onclick="' . self::MODULE_VARNAME
+                . '.distributeInstances(\'' .
                 $this->record . '\',' . $eventId . ',\'' . $formName . '\',\'' . $tableElementId . '\');" disabled><span class="fas fa-vial" aria-hidden="true"></span>&nbsp;Distribute</button>'; // Distribute
 
             $html .= '<button type="button"  id="frozenPrintButton" 
             class="btn btn-sm btn-info mr-2 ' . $tableElementId . '_btn" onclick="' .
-                self::MODULE_VARNAME . '.reprintInstances(\'' . $this->record . '\',' . $eventId . ',\'' . $formName
-                . '\',\'' . $tableElementId . '\');" disabled><span class="fas fa-print" aria-hidden="true"></span>&nbsp;Reprint</button>'; // Print vial labels
+                self::MODULE_VARNAME . '.reprintInstances(\'' . $this->record . '\',' . $eventId . ',\''
+                . $formName . '\',\'' . $tableElementId . '\');" disabled><span class="fas fa-print" aria-hidden="true"></span>&nbsp;Reprint</button>'; // Print vial labels
 
             $html .= '<button type="button" class="btn btn-sm btn-info ' . $tableElementId . '_btn" id="frozenMoveButton"
             onclick="' . self::MODULE_VARNAME . '.moveInstances(\'' . $this->record . '\',' . $eventId . ',\'' .

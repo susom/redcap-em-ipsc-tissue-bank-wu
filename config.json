@@ -82,6 +82,11 @@
 			"name": "<b>Enable Debug Logging</b><br><i>(optional)</i> Requires installation and configuration of emLogger",
 			"required": false,
 			"type": "checkbox"
+		},{
+			"key": "printer-ip",
+			"name": "Label Printer IP Address (required) Requires printer setup on local network",
+			"required": true,
+			"type" : "text"
 		}
 	],
 
