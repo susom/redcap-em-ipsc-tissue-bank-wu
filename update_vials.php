@@ -312,13 +312,28 @@ try {
         $print_data='';
         while ($row = db_fetch_assoc($result)) {
             $module->emDebug('row ' . print_r($row, true));
-            $print_data.="^XA^FO10,12^ADN,18,10^FD".$row['sample_date']."^FS";
-            $print_data.="^FO10,29^ADN,18,10^FDEXID ".$row['record']."^FS";
-            $print_data.="^FO10,46^ADN,18,10^FD".$row['freezer_box']."-".$row['freezer_slot']."^FS";
-            $print_data.="^FO10,63^ADN,18,10^FD".trim($row['type'])." ".$row['line']
-                ." ".$row['passage']."^FS";
-            $print_data.="^FO10,80^ADN,18,10^FD".$row['vialid']."^FS";
-            $print_data.="^FO10,97^BY3^BCN,50,N,N,N,A^FD".$row['vialid']."^FS";
+            $sample_date = date_create($row['sample_date']);
+            $print_data.="^XA^FO10,15^ADN,18,10^FD".date_format($sample_date, 'm/d/Y')."^FS";
+            $print_data.="^FO10,34^ADN,18,10^FDExternal ID ".$row['record']."^FS";
+            $print_data.="^FO10,54^ADN,18,10^FD".$row['freezer_box']."-".$row['freezer_slot']."^FS";
+            $desc ='';
+            if (strpos($row['type'],'Fibroblast') !== false) {
+                $desc='fb';
+            } else if (stripos($row['type'],'ipsc') !== false) {
+                $desc='ip';
+            } else {
+                $desc=substr($row['type'],0,3);
+            }
+            if (!empty($row['line'])) {
+                $desc .=" ".$row['line'];
+            }
+            if (!empty($row['passage'])) {
+                $desc .=" P".$row['passage'];
+            }
+            $print_data.="^FO10,73^ADN,18,10^FD".$desc."^FS";
+            $print_data.="^FO10,92^ADN,18,10^FD".$row['vial_id']."^FS";
+            // Code 128 Bar code
+            $print_data.="^FO5,111^BCN,35,N,N,N,A^FD".$row['vial_id']."^FS";
             $print_data.="^XZ";
         }
         $module->emDebug("ZPL:" . $print_data);
