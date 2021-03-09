@@ -237,6 +237,7 @@ and TABLE_TYPE='VIEW'";*/
         $data["vial_dist_status"] = 0;
         $this->emDebug('$data: ' . json_encode(array($data)));
         REDCap::saveData(PROJECT_ID, 'json', json_encode(array($data)));
+        return $data;
     }
 
     public function saveNewVials($record, $sample, $numA, $numB, $numD)
@@ -254,38 +255,41 @@ and TABLE_TYPE='VIEW'";*/
 
         $freezerSpec = $this->getFreezerSpace('A', $numA);
         $this->emDebug('freezer space A ' . print_r($freezerSpec, true));
+        $vials=[];
 
         for ($i = 0; $i < $numA; $i++) {
-            $this->saveVial($record, $sample, $instance++, $freezerSpec['box'], $freezerSpec['slots'][$i]);
+            $vials[] =$this->saveVial($record, $sample, $instance++,
+                $freezerSpec['box'], $freezerSpec['slots'][$i]);
         }
         $freezerSpec = $this->getFreezerSpace('B', $numB);
         $this->emDebug('freezer space B ' . print_r($freezerSpec, true));
 
         for ($i = 0; $i < $numB; $i++) {
-            $this->saveVial($record, $sample, $instance++, $freezerSpec['box'], $freezerSpec['slots'][$i]);
+            $vials[] =$this->saveVial($record, $sample, $instance++,
+                $freezerSpec['box'], $freezerSpec['slots'][$i]);
         }
         $freezerSpec = $this->getFreezerSpace('D', $numD);
         $this->emDebug('freezer space D ' . print_r($freezerSpec, true));
 
         for ($i = 0; $i < $numD; $i++) {
-            $this->saveVial($record, $sample, $instance++, $freezerSpec['box'], $freezerSpec['slots'][$i]);
+            $vials[] =$this->saveVial($record, $sample, $instance++,
+                $freezerSpec['box'], $freezerSpec['slots'][$i]);
         }
+        return $vials;
     }
-
-
 
     public function redcap_save_record($project_id, $record = null, $instrument, $event_id, $group_id = null, $survey_hash = null, $response_id = null, $repeat_instance = 1)
     {
         parent::redcap_save_record($project_id, $record, $instrument, $event_id, $group_id, $survey_hash, $response_id, $repeat_instance);
         if ($instrument === 'sample') {
-            $this->emDebug('$repeat_instance: ' . $repeat_instance);
-            $r_result = REDCap::getData(PROJECT_ID, 'json',
+            //$this->emDebug('$repeat_instance: ' . $repeat_instance);
+            $sample_data = REDCap::getData(PROJECT_ID, 'json',
                 $record, ['smp_new', 'smp_a', 'smp_b', 'smp_d'], null, null, false, false, false, "['redcap_repeat_instance']=" . $repeat_instance,);
-            $this->emDebug('$r_result: ' . $r_result);
-            $results = json_decode($r_result, true);
+            //$this->emDebug('$sample_data: ' . $sample_data);
+            $results = json_decode($sample_data, true);
             $instance_results = $results[$repeat_instance - 1];
             if ($instance_results['smp_new']) {
-                $this->saveNewVials($record, $repeat_instance, $instance_results['smp_a'],
+                $vials = $this->saveNewVials($record, $repeat_instance, $instance_results['smp_a'],
                     $instance_results['smp_b'], $instance_results['smp_d']);
                 $data = array();
                 $data["red_rec_number"] = $record;
@@ -298,6 +302,51 @@ and TABLE_TYPE='VIEW'";*/
                 $data["sample_complete"] = 2;
                 $this->emDebug('$data: ' . json_encode(array($data)));
                 REDCap::saveData(PROJECT_ID, 'json', json_encode(array($data)), 'overwrite');
+
+                /* add printing?
+                if so, $sample_data needs to retrieve smp_type, smp_date_deposited, smp_passage_number,
+                smp_line_id and set exportAsLabels = true
+                 *
+                 * foreach($vials as $index=>$vial) {
+                    //$this->emDebug('$vial ' . print_r($vial, true));
+                    $sample_date = date_create($sample_data['smp_date_deposited']);
+                    $print_data.="^XA^FO10,15^ADN,18,10^FD".date_format($sample_date, 'm/d/Y')."^FS";
+                    $print_data.="^FO10,34^ADN,18,10^FDExternal ID ".$vial['red_rec_number']."^FS";
+                    $print_data.="^FO10,54^ADN,18,10^FD".$vial['vial_freezer_box']
+                        ."-".$vial['vial_freezer_slot']."^FS";
+                    $desc ='';
+                    if (strpos($sample_data['smp_type'],'Fibroblast') !== false) {
+                        $desc='fb';
+                    } else if (stripos($sample_data['smp_type'],'ipsc') !== false) {
+                        $desc='ip';
+                    } else {
+                        $desc=substr($sample_data['smp_type'],0,3);
+                    }
+                    if (!empty($sample_data['line_id'])) {
+                        $desc .=" ".$sample_data['line_id'];
+                    }
+                    if (!empty($sample_data['smp_passage_number'])) {
+                        $desc .=" P".$sample_data['smp_passage_number'];
+                    }
+                    $print_data.="^FO10,73^ADN,18,10^FD".$desc."^FS";
+                    $print_data.="^FO10,92^ADN,18,10^FD".$vial['vial_id']."^FS";
+                    // Code 128 Bar code
+                    $print_data.="^FO5,111^BCN,35,N,N,N,A^FD".$vial['vial_id']."^FS";
+                    $print_data.="^XZ";
+                }
+                $module->emDebug("ZPL:" . $print_data);
+                try
+                {
+                    $fp=pfsockopen($module->getProjectSetting('printer-ip'),9100);
+                    fputs($fp,$print_data);
+                    fclose($fp);
+
+                    echo 'Successfully Printed';
+                }
+                catch (Exception $e)
+                {
+                    echo 'Caught printing exception: ',  $e->getMessage(), "\n";
+                }*/
             }
         }
     }
@@ -784,7 +833,7 @@ and TABLE_TYPE='VIEW'";*/
             $html .= '<button type="button"  id="frozenPrintButton" 
             class="btn btn-sm btn-info mr-2 ' . $tableElementId . '_btn" onclick="' .
                 self::MODULE_VARNAME . '.reprintInstances(\'' . $this->record . '\',' . $eventId . ',\''
-                . $formName . '\',\'' . $tableElementId . '\');" disabled><span class="fas fa-print" aria-hidden="true"></span>&nbsp;Reprint</button>'; // Print vial labels
+                . $formName . '\',\'' . $tableElementId . '\');" disabled><span class="fas fa-print" aria-hidden="true"></span>&nbsp;Print</button>'; // Print vial labels
 
             $html .= '<button type="button" class="btn btn-sm btn-info ' . $tableElementId . '_btn" id="frozenMoveButton"
             onclick="' . self::MODULE_VARNAME . '.moveInstances(\'' . $this->record . '\',' . $eventId . ',\'' .
