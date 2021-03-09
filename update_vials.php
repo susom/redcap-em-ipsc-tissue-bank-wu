@@ -145,7 +145,7 @@ try {
         $result = db_query($sql);
         $returnData = [];
         while ($row = db_fetch_assoc($result)) {
-            $module->emDebug(print_r($row, true));
+            //$module->emDebug(print_r($row, true));
             $returnData[] =$row;
         }
         $module->emDebug('return: '.json_encode($returnData));
@@ -218,11 +218,7 @@ try {
         }
 
     } else if ($_POST['updateType'] == 'move') {
-        $matches = [];
-        preg_match_all(
-            "/editInstance\((?P<record>.*?),(?P<event_id>.*?),(?P<instrument>.*?),(?P<instance>.*?)\).*?".
-            "<td>.*?<\/td><td>(?P<box>.*?)<\/td><td>(?P<slot>.*?)<\/td><\/tr>/",
-            $_POST['tablehtml'], $matches);
+        $matches = getRecordIds();
         $module->emDebug('matches: ' . print_r($matches, true));
         $sql = "select instance from redcap_data where project_id=" . PROJECT_ID .
             " and record=" . $matches['record'][0] .

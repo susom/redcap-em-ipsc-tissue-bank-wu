@@ -5,7 +5,7 @@ namespace Stanford\iPSCTissueBankWu;
 use MCRI\InstanceTable\InstanceTable;
 use REDCap;
 
-require_once "../redcap-instance-table_v3.0.1/InstanceTable.php";
+require_once "../instance_table_v9.9.9/InstanceTable.php";
 require_once "emLoggerTrait.php";
 
 class iPSCTissueBankWu extends InstanceTable
