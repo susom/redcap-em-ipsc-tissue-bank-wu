@@ -54,7 +54,13 @@ try {
 
         $result1 = db_query($sql);
         if ($result1->num_rows > 0) {
-            echo '{"success":false,"error":{"message": "Distribution can only be cancelled for vials in \"planned\" status."}}';
+            $return=[];
+            $return['success'] = false;
+            $return['errors'] =[];
+            $return['errors']['message'] = "Distribution can only be cancelled for vials in \"planned\" status.";
+            return $return;
+            //echo '{"success":false,"error":{"message": "Distribution can only be cancelled for vials in \"planned\"
+            // status."}}';
         } else {
             $jsonData = [];
             foreach ($instances as $instance) {
@@ -170,7 +176,7 @@ try {
         $matches = getRecordIds();
         $return = cancelPlanned($matches['record'][0], $matches['instance']);
         if (count($return['errors'])) {
-            echo '{"success":false, "error":"'.print_r($return['errors'], true).'"}';
+            echo '{"success":false, "error":{'.json_encode($return['errors']).'}}';
         } else {
             echo '{"success":true}';
         }

@@ -2,13 +2,13 @@
 
 namespace Stanford\iPSCTissueBankWu;
 
-use MCRI\InstanceTable\InstanceTable;
+use MCRI\EmInstanceTable\EmInstanceTable;
 use REDCap;
 
-require_once "../instance_table_v9.9.9/InstanceTable.php";
+require_once "./EmInstanceTable.php";
 require_once "emLoggerTrait.php";
 
-class iPSCTissueBankWu extends InstanceTable
+class iPSCTissueBankWu extends EmInstanceTable
 {
     use emLoggerTrait;
 
@@ -18,8 +18,46 @@ class iPSCTissueBankWu extends InstanceTable
     {
         parent::__construct();
         // Other code to run when object is instantiated
-        //$this->createEmptySlotView();
+        $this->initDb();
     }
+
+    protected function initDb()
+    {
+        /*"SELECT TABLE_SCHEMA, TABLE_NAME FROM information_schema.tables where TABLE_SCHEMA='redcap'
+and TABLE_TYPE='VIEW'";*/
+        $table_exists = db_query('select 1 from ipsc_wu_all_slots limit 1');
+        if (empty($table_exists)) {
+
+            $num_array = array();
+            for ($i = 1; $i < 780; $i++) {
+                $num_array[] = $i;
+            }
+            $sql = "create table ipsc_wu_numbers as select " . implode($num_array, ' as n union all select ') . ' as n';
+            db_query($sql);
+
+            $sql = "create table ipsc_wu_all_slots ";
+            $sql .= "select concat('A',lpad(cast(n1.n AS char),4,'0')) as box,lpad(cast(n2.n AS char),3,'0') as slot from ipsc_wu_numbers n1, ipsc_wu_numbers n2 where n1.n <= 200 and n2.n <=100 union ";
+            $sql .= "select concat('B',lpad(cast(n1.n AS char),4,'0')) as box,lpad(cast(n2.n AS char),3,'0') as slot from ipsc_wu_numbers n1, ipsc_wu_numbers n2 where n1.n <= 200 and n2.n <=100 union ";
+            $sql .= "select concat('D',lpad(cast(n1.n AS char),4,'0')) as box,lpad(cast(n2.n AS char),3,'0') as slot from ipsc_wu_numbers n1, ipsc_wu_numbers n2 where n2.n <=100 ";
+            db_query($sql);
+            $freezers = ['A', 'B', 'D'];
+            foreach ($freezers as $freezer) {
+                $sql = "create or replace view ipsc_wu_used_" . strtolower($freezer) .
+                    " as SELECT box.value as box, count(slot.value) as used_slots," .
+                    "group_concat(slot.value) as used_slots_csv FROM redcap_data dist " .
+                    "join redcap_data box on dist.record = box.record and COALESCE(dist.instance, 1) = COALESCE(box.instance, 1) " .
+                    "join redcap_data slot on dist.record = slot.record 
+            and COALESCE(dist.instance, 1) = COALESCE(slot.instance, 1) " .
+                    "where dist.project_id = " . PROJECT_ID .
+                    " and dist.field_name='vial_dist_status' and dist.value in ('0','1') " .
+                    "and box.field_name='vial_freezer_box' and box.value like '" . $freezer . "%' " .
+                    "and slot.field_name='vial_freezer_slot' group by box.value order by box.value";
+                db_query($sql);
+            }
+            db_query('drop table ipsc_wu_numbers');
+        }
+    }
+
 
     protected function setTaggedFields()
     {
@@ -62,39 +100,6 @@ class iPSCTissueBankWu extends InstanceTable
             array_unshift($instanceData[$index], '');
         }
         return $instanceData;
-    }
-
-    protected function initDb()
-    {
-        /*"SELECT TABLE_SCHEMA, TABLE_NAME FROM information_schema.tables where TABLE_SCHEMA='redcap'
-and TABLE_TYPE='VIEW'";*/
-
-        $num_array = array();
-        for ($i = 1; $i < 780; $i++) {
-            $num_array[] = $i;
-        }
-        $sql = "create table ipsc_wu_numbers as select " . implode($num_array, ' as n union all select ') . ' as n';
-        db_query($sql);
-
-        $sql = "create table ipsc_wu_all_slots ";
-        $sql .= "select concat('A',lpad(cast(n1.n AS char),4,'0')) as box,lpad(cast(n2.n AS char),3,'0') as slot from ipsc_wu_numbers n1, ipsc_wu_numbers n2 where n1.n <= 200 and n2.n <=100 union ";
-        $sql .= "select concat('B',lpad(cast(n1.n AS char),4,'0')) as box,lpad(cast(n2.n AS char),3,'0') as slot from ipsc_wu_numbers n1, ipsc_wu_numbers n2 where n1.n <= 200 and n2.n <=100 union ";
-        $sql .= "select concat('D',lpad(cast(n1.n AS char),4,'0')) as box,lpad(cast(n2.n AS char),3,'0') as slot from ipsc_wu_numbers n1, ipsc_wu_numbers n2 where n2.n <=100 ";
-        db_query($sql);
-        $freezers = ['A', 'B', 'D'];
-        foreach ($freezers as $freezer) {
-            $sql = "create or replace view IPSC_WU_USED_" . $freezer .
-                " as SELECT box.value as box, count(slot.value) as used_slots," .
-                "group_concat(slot.value) as used_slots_csv FROM redcap_data dist " .
-                "join redcap_data box on dist.record = box.record and COALESCE(dist.instance, 1) = COALESCE(box.instance, 1) " .
-                "join redcap_data slot on dist.record = slot.record 
-            and COALESCE(dist.instance, 1) = COALESCE(slot.instance, 1) " .
-                "where dist.project_id = " . PROJECT_ID .
-                " and dist.field_name='vial_dist_status' and dist.value in ['0','1'] " .
-                "and box.field_name='vial_freezer_box' and box.value like '" . $freezer . "%' " .
-                "and slot.field_name='vial_freezer_slot' group by box.value order by box.value";
-            db_query($sql);
-        }
     }
 
     public function getFreezerSpace($freezerId, $numSlots)
@@ -382,43 +387,54 @@ and TABLE_TYPE='VIEW'";*/
                 .append(taggedField.markup);
               var rows_selected = [];
               $.fn.dataTable.ext.errMode = 'none';
+              var thisTbl;
+              if (taggedField.html_table_id.indexOf('frozen') > -1 ||
+                taggedField.html_table_id.indexOf('distributed') > -1) {
+                thisTbl = $('#' + taggedField.html_table_id)
+                  .on( 'error.dt', function ( e, settings, techNote, message ) {
+                    console.log( 'An error has been reported by DataTables: ', message );
+                  } )
+                  .DataTable({
+                    "stateSave": true,
+                    "stateDuration": 0,
+                    'columnDefs': [{
+                      'targets': 0,
+                      'searchable': false,
+                      'orderable': false,
+                      'className': 'dt-body-center',
+                      'render': function (data, type, full, meta) {
+                        return '<input type="checkbox" class="' + taggedField.html_table_id + '_checkbox">';
+                      },
+                      'rowCallback': function (row, data, dataIndex) {
+                        // Get row ID
+                        var vialId = data[2];
 
-              var thisTbl = $('#' + taggedField.html_table_id)
-                .on( 'error.dt', function ( e, settings, techNote, message ) {
-                  console.log( 'An error has been reported by DataTables: ', message );
-                } )
-                .DataTable({
-                  "stateSave": true,
-                  "stateDuration": 0,
-                  'columnDefs': [{
-                    'targets': 0,
-                    'searchable': false,
-                    'orderable': false,
-                    'className': 'dt-body-center',
-                    'render': function (data, type, full, meta) {
-                      return '<input type="checkbox" class="' + taggedField.html_table_id + '_checkbox">';
-                    },
-                    'rowCallback': function (row, data, dataIndex) {
-                      // Get row ID
-                      var vialId = data[2];
-
-                      // If row ID is in the list of selected row IDs
-                      if ($.inArray(vialId, rows_selected) !== -1) {
-                        $(row).find('input[type="checkbox"]').prop('checked', true);
-                        $(row).addClass('selected');
-                      }
-                    }
-                  },
-                  {
-                    'targets': function() {
-                      if (taggedField.html_table_id.indexOf('frozen') > -1) {
-                        return [5,6,7,8,9,10];
+                        // If row ID is in the list of selected row IDs
+                        if ($.inArray(vialId, rows_selected) !== -1) {
+                          $(row).find('input[type="checkbox"]').prop('checked', true);
+                          $(row).addClass('selected');
+                        }
                       }
                     },
-                    'visible': false,
-                    'searchable':false
-                  }]
-                });
+                      {
+                        'targets': function() {
+                          if (taggedField.html_table_id.indexOf('frozen') > -1) {
+                            return [5,6,7,8,9,10];
+                          }
+                        },
+                        'visible': false,
+                        'searchable':false
+                      }]
+                  });
+              } else {
+                thisTbl = $('#' + taggedField.html_table_id)
+                  .DataTable({
+                    "stateSave": true,
+                    "stateDuration": 0,
+                    "lengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]]
+                  });
+              }
+
               /*if (taggedField.html_table_id.indexOf('frozen') > -1) {
                 thisTbl.columns([5,6,7,8,9,10]).visible(false);
               }*/
@@ -535,29 +551,34 @@ and TABLE_TYPE='VIEW'";*/
             var $chkbox_checked = $('tbody input[type="checkbox"]:checked', $table);
             var chkbox_select_all = $('thead input[name="select_all"]', $table).get(0);
 
-            // If none of the checkboxes are checked
-            if ($chkbox_checked.length === 0) {
-              chkbox_select_all.checked = false;
-              if ('indeterminate' in chkbox_select_all) {
-                chkbox_select_all.indeterminate = false;
-              }
-              $('.' + tableId + '_btn').prop('disabled', true);
-              // If all of the checkboxes are checked
-            } else if ($chkbox_checked.length === $chkbox_all.length) {
-              chkbox_select_all.checked = true;
-              if ('indeterminate' in chkbox_select_all) {
-                chkbox_select_all.indeterminate = false;
-              }
-              $('.' + tableId + '_btn').prop('disabled', false);
+            try {
+              // If none of the checkboxes are checked
+              if ($chkbox_checked.length === 0) {
+                chkbox_select_all.checked = false;
+                if ('indeterminate' in chkbox_select_all) {
+                  chkbox_select_all.indeterminate = false;
+                }
+                $('.' + tableId + '_btn').prop('disabled', true);
+                // If all of the checkboxes are checked
+              } else if ($chkbox_checked.length === $chkbox_all.length) {
+                chkbox_select_all.checked = true;
+                if ('indeterminate' in chkbox_select_all) {
+                  chkbox_select_all.indeterminate = false;
+                }
+                $('.' + tableId + '_btn').prop('disabled', false);
 
-              // If some of the checkboxes are checked
-            } else {
-              chkbox_select_all.checked = true;
-              if ('indeterminate' in chkbox_select_all) {
-                chkbox_select_all.indeterminate = true;
+                // If some of the checkboxes are checked
+              } else {
+                chkbox_select_all.checked = true;
+                if ('indeterminate' in chkbox_select_all) {
+                  chkbox_select_all.indeterminate = true;
+                }
+                $('.' + tableId + '_btn').prop('disabled', false);
               }
-              $('.' + tableId + '_btn').prop('disabled', false);
+            } catch (e) {
+              console.log( 'Caught exception: ' +  e.message);
             }
+
           }
 
           function displaySelected(tableId) {
@@ -612,10 +633,11 @@ and TABLE_TYPE='VIEW'";*/
                     data: {"updateType":"delete", "tablehtml": '"'+selectedTable.find('tbody').html()+'"'},
                     dataType: 'json',
                     success: function (response) {
-                      console.log("Success " + response);
+                      //console.log("Success " + response);
                       refreshTables();
                     },
                     error: function (request, error) {
+                      alert('Unable to Delete Vials:' + error);
                       console.log('Request ' + request);
                       console.log('Error ' + error);
                     }
@@ -659,7 +681,7 @@ and TABLE_TYPE='VIEW'";*/
                         + '","vial_dist_irb_exp":"'+$('#distIrbExp').val()+'"}'},
                     dataType: 'json',
                     success: function (response) {
-                      console.log(response);
+                      //console.log(response);
                       refreshTables();
                     },
                     error: function (request, error) {
@@ -684,10 +706,10 @@ and TABLE_TYPE='VIEW'";*/
                     data: {"updateType":"print", "tablehtml": '"'+selectedTable.find('tbody').html()+'"'},
                     dataType: 'json',
                     success: function (response) {
-                      console.log(response);
+                      //console.log(response);
                     },
                     error: function (request, error) {
-                      console.log(request);
+                      //console.log(request);
                       console.log(error);
                     }
                   });
@@ -715,7 +737,7 @@ and TABLE_TYPE='VIEW'";*/
                       "updateData": '"'+$('#moveToFreezer').val() + '"'},
                     dataType: 'json',
                     success: function (response) {
-                      console.log(response);
+                      //console.log(response);
                       refreshTables();
                     },
                     error: function (request, error) {
@@ -741,10 +763,11 @@ and TABLE_TYPE='VIEW'";*/
                     data: {"updateType":"cancel", "tablehtml": '"'+selectedTable.find('tbody').html()+'"'},
                     dataType: 'json',
                     success: function (response) {
-                      console.log(response);
+                      //console.log(response);
                       refreshTables();
                     },
                     error: function (request, error) {
+                      alert('Unable to Cancel Vials: ' + error);
                       console.log(request);
                       console.log(error);
                     }
@@ -841,7 +864,7 @@ and TABLE_TYPE='VIEW'";*/
         }
 
         // if distribute table
-        if (strpos($tableElementId, 'distribut')) {
+        else if (strpos($tableElementId, 'distribut')) {
             $html .= '<button type="button" id="distributeDeleteButton" 
             class="btn btn-sm btn-danger mr-2 ' . $tableElementId . '_btn" onclick="' .
                 self::MODULE_VARNAME .
@@ -853,6 +876,9 @@ and TABLE_TYPE='VIEW'";*/
                 . self::MODULE_VARNAME . '.cancelInstances(\'' . $this->record . '\',' . $eventId . ',\'' . $formName . '\',\''
                 . $tableElementId . '\');" disabled><span class="fas fa-minus-circle" aria-hidden="true"></span>&nbsp;Cancel Distribution</button>'; // Cancel vial distribution
             $html .= '</div>';
+        } else {
+          return parent::makeHtmlTable($tableElementId, $tableFormClass,
+              $eventId, $formName, $canEdit, $scrollX);
         }
         return $html;
     }
