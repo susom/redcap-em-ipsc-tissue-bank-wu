@@ -390,6 +390,9 @@ and TABLE_TYPE='VIEW'";*/
               var thisTbl;
               if (taggedField.html_table_id.indexOf('frozen') > -1 ||
                 taggedField.html_table_id.indexOf('distributed') > -1) {
+                var notvisible = [];
+                if (taggedField.html_table_id.indexOf('frozen') > -1)
+                  notvisible = [5,6,7,8,9,10];
                 thisTbl = $('#' + taggedField.html_table_id)
                   .on( 'error.dt', function ( e, settings, techNote, message ) {
                     console.log( 'An error has been reported by DataTables: ', message );
@@ -415,16 +418,12 @@ and TABLE_TYPE='VIEW'";*/
                           $(row).addClass('selected');
                         }
                       }
-                    },
-                      {
-                        'targets': function() {
-                          if (taggedField.html_table_id.indexOf('frozen') > -1) {
-                            return [5,6,7,8,9,10];
-                          }
-                        },
+                    }
+                    ,{
+                        'targets': notvisible,
                         'visible': false,
                         'searchable':false
-                      }]
+                    }]
                   });
               } else {
                 thisTbl = $('#' + taggedField.html_table_id)
@@ -583,7 +582,7 @@ and TABLE_TYPE='VIEW'";*/
 
           function displaySelected(tableId) {
             let colIndices = [];
-            if (tableId.indexOf('frozen') != -1) {
+            if (tableId.indexOf('frozen') > -1) {
               colIndices = [2, 3, 4, 5];
             } else {
               colIndices = [2, 3, 4, 5, 6, 7, 8, 9];
