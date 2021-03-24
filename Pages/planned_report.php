@@ -34,19 +34,37 @@ $module->emDebug('empty slot report url ' . $url);
           //
           function updateDataTableSelectAllCtrl(table) {
             var $table = table.table().node();
+            var tableId = $table.id;
             var $chkbox_all = $('tbody input[type="checkbox"]', $table);
             var $chkbox_checked = $('tbody input[type="checkbox"]:checked', $table);
             var chkbox_select_all = $('thead input[name="select_all"]', $table).get(0);
 
-            // If none of the checkboxes are checked
-            if ($chkbox_checked.length === 0) {
-              chkbox_select_all.checked = false;
-              // If all of the checkboxes are checked
-            } else if ($chkbox_checked.length === $chkbox_all.length) {
-              chkbox_select_all.checked = true;
-              // If some of the checkboxes are checked
-            } else {
-              chkbox_select_all.checked = true;
+            try {
+              // If none of the checkboxes are checked
+              if ($chkbox_checked.length === 0) {
+                chkbox_select_all.checked = false;
+                if ('indeterminate' in chkbox_select_all) {
+                  chkbox_select_all.indeterminate = false;
+                }
+                $('.' + tableId + '_btn').prop('disabled', true);
+                // If all of the checkboxes are checked
+              } else if ($chkbox_checked.length === $chkbox_all.length) {
+                chkbox_select_all.checked = true;
+                if ('indeterminate' in chkbox_select_all) {
+                  chkbox_select_all.indeterminate = false;
+                }
+                $('.' + tableId + '_btn').prop('disabled', false);
+
+                // If some of the checkboxes are checked
+              } else {
+                chkbox_select_all.checked = true;
+                if ('indeterminate' in chkbox_select_all) {
+                  chkbox_select_all.indeterminate = true;
+                }
+                $('.' + tableId + '_btn').prop('disabled', false);
+              }
+            } catch (e) {
+              console.log( 'Caught exception: ' +  e.message);
             }
           }
 
@@ -56,9 +74,9 @@ $module->emDebug('empty slot report url ' . $url);
             let recordInstances = '[';
             selected.each(function() {
               recordInstances += '{"record":"'+$(this).find(':nth-child(2)').text()+'",';
-              recordInstances += '"instance":'+$(this).find(':first-child input[type="checkbox"]').attr('id')+'}';
+              recordInstances += '"instance":'+$(this).find(':first-child input[type="checkbox"]').attr('id')+'},';
             });
-            recordInstances +=']';
+            recordInstances = recordInstances.slice(0, -1) + ']';
 
             $.ajax({
               type: "POST",
@@ -68,10 +86,16 @@ $module->emDebug('empty slot report url ' . $url);
               success: function (data) {
                 var thisTable = $('#planned_table').DataTable();
                 thisTable.clear().rows.add(data.data).draw();
+                if (!data['success']) {
+                  alert('Set to Shipped Error:' + data['errors']);
+                }
+
               },
               error: function (request, error) {
                 console.log('Request ' + request);
-                console.log('Error ' + error);
+                var thisTable = $('#planned_table').DataTable();
+                thisTable.clear().rows.add(data.data).draw();
+                alert('Set to Shipped Error:' + error);
               }
             });
           }
@@ -82,9 +106,10 @@ $module->emDebug('empty slot report url ' . $url);
             let recordInstances = '[';
             selected.each(function() {
               recordInstances += '{"record":"'+$(this).find(':nth-child(2)').text()+'",';
-              recordInstances += '"instance":'+$(this).find(':first-child input[type="checkbox"]').attr('id')+'}';
+              recordInstances += '"instance":'+$(this).find(':first-child input[type="checkbox"]').attr('id')+'},';
             });
-            recordInstances +=']';
+            // remove the last comma and add the end ]
+            recordInstances = recordInstances.slice(0, -1) + ']';
 
             $.ajax({
               type: "POST",
@@ -92,12 +117,17 @@ $module->emDebug('empty slot report url ' . $url);
               data: {"updateType":"cancelPlannedReport","recordsToSave":recordInstances},
               dataType: 'json',
               success: function (data) {
-                var thisTable = $('#planned_table').DataTable();
-                thisTable.clear().rows.add(data.data).draw();
+                 var thisTable = $('#planned_table').DataTable();
+                 thisTable.clear().rows.add(data.data).draw();
+                 if (!data['success']) {
+                    alert('Cancel Error:' + data['errors']);
+                 }
               },
               error: function (request, error) {
                 console.log('Request ' + request);
-                console.log('Error ' + error);
+                var thisTable = $('#planned_table').DataTable();
+                thisTable.clear().rows.add(data.data).draw();
+                alert('Cancel Error:' + error);
               }
             });
           }
@@ -129,7 +159,7 @@ $module->emDebug('empty slot report url ' . $url);
                 "data": {"updateType":"plannedReport"},
                 "error":  function (request, error) {
                     console.log('Request ' + request);
-                    console.log('Error ' + error);
+                alert('Cancel Error:' + error);
                   }
               },
               "columnDefs":[

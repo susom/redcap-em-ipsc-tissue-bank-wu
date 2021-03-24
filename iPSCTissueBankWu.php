@@ -96,9 +96,19 @@ and TABLE_TYPE='VIEW'";*/
     {
         $this->emLog('form: ' . $form . ' filter: ' . $filter);
         $instanceData = $this->getInstanceData($record, $event, $form, $filter, false);
-        foreach ($instanceData as $index => $row) {
-            array_unshift($instanceData[$index], '');
+        if (!empty($instanceData)) {
+            foreach ($instanceData as $index => $row) {
+
+                $link=preg_replace('/(<a.*?>).*?<\/a>/', '$1'.$row[1].'</a>', $row[0]);
+                $row[0]='';
+                $row[1] = $link;
+                $instanceData[$index] = $row;
+                //array_unshift($instanceData[$index], '');
+            }
+        } else {
+          $instanceData=[];
         }
+        $this->emDebug('getSelectableInstanceData $instanceData ' . print_r($instanceData, true));
         return $instanceData;
     }
 
@@ -107,7 +117,7 @@ and TABLE_TYPE='VIEW'";*/
         $this->emDebug('numSlots = ' . $numSlots);
         if (!$numSlots) return;
         if ($numSlots > 5) {
-            $sql = "select box from ipsc_wu_all_slots where box like '" . $freezerId . "%' and box not in (select box from ipsc_wu_used_" . strtolower($freezerId) . ") limit 1";
+            $sql = "select box from ipsc_wu_all_slots where box like '" . strtolower($freezerId) . "%' and box not in (select box from ipsc_wu_used_" . strtolower($freezerId) . ") limit 1";
             $this->emDebug('getFreezerSpace $sql ' . $sql);
             $result1 = db_query($sql);
             $row = db_fetch_assoc($result1);
@@ -119,7 +129,7 @@ and TABLE_TYPE='VIEW'";*/
             if ($prevBoxValue > 0) {
                 $prevBox = $freezerId . str_pad($prevBoxValue, 4,
                         '0', STR_PAD_LEFT);
-                $sql = "select box, used_slots, used_csv from ipsc_wu_used_" . strtolower($freezerId) .
+                $sql = "select box, used_slots, used_slots_csv from ipsc_wu_used_" . strtolower($freezerId) .
                     " where box ='" . $prevBox . "'";
                 $freezer = $this->allocateFreezerSpace($sql, $freezerId, $numSlots, true);
             }
@@ -134,7 +144,7 @@ and TABLE_TYPE='VIEW'";*/
             }
             return $freezer;
         } else {
-            $sql = "select box, used_slots, used_csv from ipsc_wu_used_"
+            $sql = "select box, used_slots, used_slots_csv from ipsc_wu_used_"
                 . strtolower($freezerId)
                 . " where used_slots <" . (100 - $numSlots) . ' order by box limit 1';
             $this->emDebug('getFreezerSpace $sql ' . $sql);
@@ -177,7 +187,7 @@ and TABLE_TYPE='VIEW'";*/
 
         $freeSlots = 100 - $row['used_slots'];
         if ($freeSlots >= $numSlots) {
-            $usedSlots = explode(",", $row['used_csv'],);
+            $usedSlots = explode(",", $row['used_slots_csv'],);
             //$this->emDebug('allocateFreezerSpace $usedSlots '. print_r($usedSlots, true));
 
             $usedSlots = array_flip($usedSlots);
@@ -283,16 +293,30 @@ and TABLE_TYPE='VIEW'";*/
         return $vials;
     }
 
-    public function redcap_save_record($project_id, $record = null, $instrument, $event_id, $group_id = null, $survey_hash = null, $response_id = null, $repeat_instance = 1)
+    public function redcap_save_record($project_id, $record=null, $instrument, $event_id, $group_id = null,
+                                       $survey_hash = null, $response_id = null, $repeat_instance=1)
     {
-        parent::redcap_save_record($project_id, $record, $instrument, $event_id, $group_id, $survey_hash, $response_id, $repeat_instance);
-        if ($instrument === 'sample') {
-            //$this->emDebug('$repeat_instance: ' . $repeat_instance);
-            $sample_data = REDCap::getData(PROJECT_ID, 'json',
-                $record, ['smp_new', 'smp_a', 'smp_b', 'smp_d'], null, null, false, false, false, "['redcap_repeat_instance']=" . $repeat_instance,);
-            //$this->emDebug('$sample_data: ' . $sample_data);
+      if (!empty($_GET['instance'])) {
+        $repeat_instance=$_GET['instance'];
+      }
+        parent::redcap_save_record($project_id, $record, $instrument, $event_id, $group_id, $survey_hash,
+            $response_id, $repeat_instance);
+        if ($instrument == 'sample') {
+            $this->emDebug("repeat_instance: $repeat_instance record: $record getinstance=".$_GET['instance']);
+            $sample_data_array = REDCap::getData(PROJECT_ID, 'array',
+            $record, ['smp_new', 'smp_a', 'smp_b', 'smp_d'], null, null, false, false, false,
+             "['redcap_repeat_instance']=" . $repeat_instance,);
+            $this->emDebug('save sample_data_array: ' . print_r($sample_data_array, true));
+
+            /*$sample_data = REDCap::getData(PROJECT_ID, 'json',
+                $record, ['smp_new', 'smp_a', 'smp_b', 'smp_d'], null, null, false, false, false,
+                 "['redcap_repeat_instance']=" . $repeat_instance,);
+            $this->emDebug('save sample_data: ' . $sample_data);
             $results = json_decode($sample_data, true);
-            $instance_results = $results[$repeat_instance - 1];
+            $instance_results = $results[$repeat_instance - 1];*/
+            $instance_results = $sample_data_array[$record]['repeat_instances'][$event_id][$instrument][$repeat_instance];
+            $this->emDebug('save instance_array: ' . print_r($instance_results, true));
+
             if ($instance_results['smp_new']) {
                 $vials = $this->saveNewVials($record, $repeat_instance, $instance_results['smp_a'],
                     $instance_results['smp_b'], $instance_results['smp_d']);
@@ -305,7 +329,7 @@ and TABLE_TYPE='VIEW'";*/
                 $data["smp_b"] = "";
                 $data["smp_d"] = "";
                 $data["sample_complete"] = 2;
-                $this->emDebug('$data: ' . json_encode(array($data)));
+                $this->emDebug('$data to save: ' . json_encode(array($data)));
                 REDCap::saveData(PROJECT_ID, 'json', json_encode(array($data)), 'overwrite');
 
                 /* add printing?
@@ -356,6 +380,152 @@ and TABLE_TYPE='VIEW'";*/
         }
     }
 
+    /**
+     * This is mostly a copy of EMInstanceTable function with addition of vialId
+     */
+    protected function popupViewTweaks()
+    {
+        ?>
+      <style type="text/css">
+          .navbar-toggler, #west, #formSaveTip, #dataEntryTopOptionsButtons, #formtop-div {
+              display: none !important;
+          }
+
+          /*div[aria-describedby="reqPopup"] > .ui-dialog-buttonpane > button { color:red !important; visibility: hidden; }*/
+      </style>
+      <script type="text/javascript">
+
+        $.urlParamReplace = function (url, name, value) {
+          var results = new RegExp('[\?&]' + name + '=([^&#]*)')
+            .exec(url);
+          if (results !== null) {
+            return url.replace(name + '=' + results[1], name + '=' + value);
+          } else {
+            return url;
+          }
+        }
+
+        $.urlParamValue = function (url, name) {
+          var results = new RegExp('[\?&]' + name + '=([^&#]*)')
+            .exec(url);
+          if (results !== null) {
+            return results[1];
+          }
+          return null;
+        }
+
+        $.redirectUrl = function (url) {
+          window.location.href = url;
+          return;
+        }
+
+        $(document).ready(function () {
+          // add this window.unload for added reliability in invoking refreshTables on close of popup
+          window.onunload = function () {
+            window.opener.refreshTables();
+          };
+
+          if ($('input[name="vial_id"]').length > 0
+            && !$('input[name="vial_id"]').val()) {
+            $('input[name="vial_id"]').val("<?php echo $this->getNewVialId()?>");
+          }
+
+          $('#form').attr('action', $('#form').attr('action') + '&extmod_instance_table=1');
+          $('button[name=submit-btn-saverecord]')// Save & Close
+            .attr('name', 'submit-btn-savecontinue')
+            .removeAttr('onclick')
+            .click(function (event) {
+              dataEntrySubmit(this);
+              event.preventDefault();
+              window.opener.refreshTables();
+              window.setTimeout(window.close, 800);
+            });
+          /* highjacking existing buttons for custom functionality*/
+          $('#submit-btn-savenextform')
+            // Save & New Instance
+            // default redcap behavior does not always have this option available
+            .attr('name', 'submit-btn-savecontinue')
+            .removeAttr('onclick')
+            .text(<?php echo "'" . $this->lang['data_entry_275'] . "'"?>)
+            .click(function (event) {
+              var currentUrl = window.location.href;
+              dataEntrySubmit(this);
+              event.preventDefault();
+              window.opener.refreshTables();
+              var redirectUrl = $.urlParamReplace(currentUrl, "instance", 1)
+                + '&extmod_instance_table_add_new=1';
+              window.setTimeout($.redirectUrl, 500, redirectUrl);
+            });
+          $('#submit-btn-savenextinstance')
+            // Save and Next Instance -- go to next instance of same parent
+            // default redcap behavior goes to next instance, regardless of parent.
+            .attr('name', 'submit-btn-savecontinue')
+            .removeAttr('onclick')
+            .text(<?php echo "'" . $this->lang['data_entry_276'] . "'"?>)
+            .click(function (event) {
+              var currentUrl = window.location.href;
+              dataEntrySubmit(this);
+              event.preventDefault();
+              window.opener.refreshTables();
+              var next = $.urlParamValue(currentUrl, "next_instance");
+              var redirectUrl = currentUrl;
+              if (next == null) {
+                redirectUrl = currentUrl + '&next_instance=1';
+              } else {
+                redirectUrl = $.urlParamReplace(redirectUrl, "next_instance", parseInt(next) + 1);
+              }
+              window.setTimeout($.redirectUrl, 500, redirectUrl);
+            });
+          $('#submit-btn-saveexitrecord').css("display", "none");
+          $('#submit-btn-savenextrecord').css("display", "none");
+          $('button[name=submit-btn-cancel]')
+            .removeAttr('onclick')
+            .click(function () {
+              window.opener.refreshTables();
+              window.close();
+            });
+            <?php
+            if ( isset($_GET['extmod_instance_table_add_new'])) {
+            ?>
+          $('button[name=submit-btn-deleteform]').css("display", "none");
+            <?php
+            } else {
+            ?>
+          $('button[name=submit-btn-deleteform]')
+            .removeAttr('onclick')
+            .click(function (event) {
+              simpleDialog('<div style="margin:10px 0;font-size:13px;">' +
+                  <?php echo '"' . $this->lang['data_entry_239'] .
+                      '<div style=&quot;margin-top:15px;color:#C00000;&quot;>' .
+                      $this->lang['data_entry_432'] . ' <b>' . $_GET['instance'] . '</b></div> ' .
+                      '<div style=&quot;margin-top:15px;color:#C00000;font-weight:bold;&quot;>' .
+                      $this->lang['data_entry_190'] . '</div> </div>"'?>,
+                'DELETE ALL DATA ON THIS FORM?', null, 600, null,
+                'Cancel',
+                function () {
+                  dataEntrySubmit(document.getElementsByName('submit-btn-deleteform')[0]);
+                  event.preventDefault();
+                  window.opener.refreshTables();
+                  window.setTimeout(window.close, 300);
+                },
+                  <?php echo "'" . $this->lang['data_entry_234'] . "'"?>);//Delete data for THIS FORM only
+              return false;
+            });
+            <?php
+            }
+            if (isset($_GET['__reqmsg'])) {
+            ?>
+          setTimeout(function () {
+            $('div[aria-describedby="reqPopup"]').find('div.ui-dialog-buttonpane').find('button').not(':last').hide(); // .css('visibility', 'visible'); // required fields message show only "OK" button, not ignore & leave
+          }, 100);
+            <?php
+            }
+            ?>
+        });
+      </script>
+        <?php
+    }
+
     protected function insertJS()
     {
         ?>
@@ -381,6 +551,7 @@ and TABLE_TYPE='VIEW'";*/
           var update_vials_url = '<?php echo $this->getUrl('update_vials.php') ?>'
 
         $(document).ready(function () {
+
             config.forEach(function (taggedField) {
               taggedFieldNames.push(taggedField.field_name);
               $('#' + taggedField.field_name + '-tr td:last')
@@ -392,7 +563,7 @@ and TABLE_TYPE='VIEW'";*/
                 taggedField.html_table_id.indexOf('distributed') > -1) {
                 var notvisible = [];
                 if (taggedField.html_table_id.indexOf('frozen') > -1)
-                  notvisible = [5,6,7,8,9,10];
+                  notvisible = [4,5,6,7,8,9];
                 thisTbl = $('#' + taggedField.html_table_id)
                   .on( 'error.dt', function ( e, settings, techNote, message ) {
                     console.log( 'An error has been reported by DataTables: ', message );
@@ -421,8 +592,7 @@ and TABLE_TYPE='VIEW'";*/
                     }
                     ,{
                         'targets': notvisible,
-                        'visible': false,
-                        'searchable':false
+                        'visible': false
                     }]
                   });
               } else {
@@ -526,19 +696,6 @@ and TABLE_TYPE='VIEW'";*/
             return win.open(url, title, 'status,scrollbars,resizable,width=' + w + ',height=' + h + ',top=' + y + ',left=' + x);
           }
 
-          function refreshTableDialog() {
-            simpleDialog('Refresh the table contents and display any changes (instances added, updated or deleted).'
-              , 'Refresh Table?', null, 500
-              , null, langNo
-              , function () {
-                // refresh all instance tables (e.g. to pick up changes to multiple forms across repeating event
-                $('.' + tableClass).each(function () {
-                  $(this).DataTable().ajax.reload(null, false); // don't reset user paging on reload
-                });
-              }, langYes
-            );
-          }
-
           //
           // Updates "Select all" control in a data table
           // from https://www.gyrocode.com/articles/jquery-datatables-checkboxes/
@@ -583,9 +740,9 @@ and TABLE_TYPE='VIEW'";*/
           function displaySelected(tableId) {
             let colIndices = [];
             if (tableId.indexOf('frozen') > -1) {
-              colIndices = [2, 3, 4, 5];
+              colIndices = [2, 3, 4];
             } else {
-              colIndices = [2, 3, 4, 5, 6, 7, 8, 9];
+              colIndices = [2, 3, 4, 5, 6, 7, 8];
             }
 
             let colNames = $('<tr>');
@@ -634,6 +791,9 @@ and TABLE_TYPE='VIEW'";*/
                     success: function (response) {
                       //console.log("Success " + response);
                       refreshTables();
+                      if (!response['success']) {
+                        alert('Unable to Delete Vials: ' + response['errors']);
+                      }
                     },
                     error: function (request, error) {
                       alert('Unable to Delete Vials:' + error);
@@ -682,6 +842,9 @@ and TABLE_TYPE='VIEW'";*/
                     success: function (response) {
                       //console.log(response);
                       refreshTables();
+                      if (!response['success']) {
+                        alert('Unable to Distribute Vials: ' + response['errors']);
+                      }
                     },
                     error: function (request, error) {
                       console.log(request);
@@ -706,6 +869,9 @@ and TABLE_TYPE='VIEW'";*/
                     dataType: 'json',
                     success: function (response) {
                       //console.log(response);
+                      if (!response['success']) {
+                        alert('Unable to Print: ' + response['errors']);
+                      }
                     },
                     error: function (request, error) {
                       //console.log(request);
@@ -738,6 +904,9 @@ and TABLE_TYPE='VIEW'";*/
                     success: function (response) {
                       //console.log(response);
                       refreshTables();
+                      if (!response['success']) {
+                        alert('Unable to Move Vials: ' + response['errors']);
+                      }
                     },
                     error: function (request, error) {
                       console.log(request);
@@ -764,6 +933,9 @@ and TABLE_TYPE='VIEW'";*/
                     success: function (response) {
                       //console.log(response);
                       refreshTables();
+                      if (!response['success']) {
+                        alert('Unable to Cancel Vials: ' + response['errors']);
+                      }
                     },
                     error: function (request, error) {
                       alert('Unable to Cancel Vials: ' + error);
@@ -780,7 +952,8 @@ and TABLE_TYPE='VIEW'";*/
 
         function refreshTables() {
           var tableClass = '<?php echo self::MODULE_VARNAME;?>';
-          $('.' + tableClass).each(function () {
+          var tables = $('.' + tableClass);
+          tables.each(function () {
             $(this).DataTable().ajax.reload(null, false); // don't reset user paging on reload
           });
         }
@@ -798,7 +971,7 @@ and TABLE_TYPE='VIEW'";*/
         table-responsive ' . self::MODULE_VARNAME . ' ' . $tableFormClass . '" cellspacing="0" style="width:100%;' .
             $scrollStyle . '">';
         $html .= '<thead><tr><th><input type="checkbox" name="select_all" value="1" id="' . $tableElementId . '-select-all"></th>';
-        $html .= '<th>#</th>'; // .$this->lang['data_entry_246'].'</th>'; // Instance
+        //$html .= '<th>#</th>'; // .$this->lang['data_entry_246'].'</th>'; // Instance
         $repeatingFormFields = REDCap::getDataDictionary('array', false, null, $formName);
 
         foreach ($repeatingFormFields as $repeatingFormFieldDetails) {
@@ -881,6 +1054,18 @@ and TABLE_TYPE='VIEW'";*/
         }
         return $html;
     }
+
+    /*public function redcap_every_page_before_render($project_id)
+    {
+      parent::redcap_every_page_before_render($project_id);
+        if (PAGE === 'DataEntry/index.php'
+            && isset($_GET['extmod_instance_table'])
+            && isset($_GET['extmod_instance_table_add_new'])
+            && $_GET['page']==='vial') {
+            $_GET['new_vial'] = $this->getNewVialId();
+        }
+
+    }*/
 
 
 
