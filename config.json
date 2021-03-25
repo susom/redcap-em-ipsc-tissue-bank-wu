@@ -44,16 +44,6 @@
 				"icon": "gear",
 				"url": "Pages/moved_report.php",
 				"show-header-and-footer": true
-			},
-			{
-				"name": "Zebra Sample Print",
-				"icon": "gear",
-				"url": "zebra-browser-print-js-v30216/sample/sample.php"
-			},
-			{
-				"name": "Zebra Print Documentation",
-				"icon": "gear",
-				"url": "zebra-browser-print-js-v30216/Documentation/index.html"
 			}
 
 		],
