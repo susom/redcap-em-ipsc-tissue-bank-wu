@@ -299,15 +299,15 @@ try {
 
             $return = cancelPlanned($record['record'], $instances);
             if (!$return['success']) {
-                echo json_encode($return);
                 break;
             }
         }
         if ($return['success']) {
             $return = getPlanned();
-            //$module->emDebug('cancelPlannedReport return: '.$temp);
-            echo json_encode($return);
         }
+        //$module->emDebug('cancelPlannedReport return: '.$temp);
+        echo json_encode($return);
+
     }
     else if ($_POST['updateType'] == 'distribute') {
         $matches = getRecordIds();
@@ -447,7 +447,7 @@ try {
             $result['success']=false;
             echo json_encode($result);
         } else {
-            echo getPlanned();
+            echo json_encode(getPlanned());
         }
 
     }
