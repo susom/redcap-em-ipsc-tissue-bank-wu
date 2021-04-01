@@ -39,6 +39,7 @@ and TABLE_TYPE='VIEW'";*/
             $sql .= "select concat('A',lpad(cast(n1.n AS char),4,'0')) as box,lpad(cast(n2.n AS char),3,'0') as slot from ipsc_wu_numbers n1, ipsc_wu_numbers n2 where n1.n <= 200 and n2.n <=100 union ";
             $sql .= "select concat('B',lpad(cast(n1.n AS char),4,'0')) as box,lpad(cast(n2.n AS char),3,'0') as slot from ipsc_wu_numbers n1, ipsc_wu_numbers n2 where n1.n <= 200 and n2.n <=100 union ";
             $sql .= "select concat('D',lpad(cast(n1.n AS char),4,'0')) as box,lpad(cast(n2.n AS char),3,'0') as slot from ipsc_wu_numbers n1, ipsc_wu_numbers n2 where n2.n <=100 ";
+            $this->emDebug('create ipsc_wu_all_slots '.$sql);
             db_query($sql);
             $freezers = ['A', 'B', 'D'];
             foreach ($freezers as $freezer) {
@@ -53,6 +54,8 @@ and TABLE_TYPE='VIEW'";*/
                     "and box.field_name='vial_freezer_box' and box.value like '" . $freezer . "%' " .
                     "and slot.field_name='vial_freezer_slot' group by box.value order by box.value";
                 db_query($sql);
+                $this->emDebug('create ipsc_wu_used_' . strtolower($freezer) .' '. $sql);
+
             }
             db_query('drop table ipsc_wu_numbers');
         }
