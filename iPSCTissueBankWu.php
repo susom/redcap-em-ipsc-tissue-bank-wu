@@ -803,7 +803,7 @@ and TABLE_TYPE='VIEW'";*/
                   });
                 },
                 'Delete');
-              console.log(selectedTable.html());
+              //console.log(selectedTable.html());
             },
             distributeInstances: function (record, event, form, tableId) {
               let selectedTable = displaySelected(tableId);
@@ -847,6 +847,7 @@ and TABLE_TYPE='VIEW'";*/
                       }
                     },
                     error: function (request, error) {
+                      alert('Error occurred: ' + response['errors']);
                       console.log(request);
                       console.log(error);
                     }
@@ -874,7 +875,8 @@ and TABLE_TYPE='VIEW'";*/
                       }
                     },
                     error: function (request, error) {
-                      //console.log(request);
+                      alert('Error occurred: ' + response['errors']);
+                      console.log(request);
                       console.log(error);
                     }
                   });
@@ -909,6 +911,7 @@ and TABLE_TYPE='VIEW'";*/
                       }
                     },
                     error: function (request, error) {
+                      alert('Error occurred: ' + response['errors']);
                       console.log(request);
                       console.log(error);
                     }
@@ -945,7 +948,7 @@ and TABLE_TYPE='VIEW'";*/
                   });
                 },
                 'Cancel Distribution');
-              console.log(selectedTable.html());
+              //console.log(selectedTable.html());
             },
           }
         })(window, document, jQuery, app_path_webroot, pid, simpleDialog);

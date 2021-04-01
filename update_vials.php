@@ -290,7 +290,7 @@ try {
     }
     else if ($_POST['updateType'] == 'cancelPlannedReport') {
         $recordsToSave = json_decode($_POST['recordsToSave'], true);
-        $module->emDebug('recordsToSave: '. print_r($recordsToSave, true));
+        //$module->emDebug('recordsToSave: '. print_r($recordsToSave, true));
         $return = [];
         foreach($recordsToSave as $record) {
             $instances = [];
