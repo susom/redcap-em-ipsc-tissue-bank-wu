@@ -123,10 +123,11 @@ try {
             $print_data.="^XZ";
         }
         $module->emDebug("ZPL:" . $print_data);
-        $fp=pfsockopen($module->getProjectSetting('printer-ip'),9100,
-            $errno, $errstr);
+        $fp=fsockopen($module->getProjectSetting('printer-ip'),9100,
+            $errno, $errstr, 60);
         $return = [];
         if (!$fp) {
+            $module->emDebug("print error: $errstr ($errno)");
             $return['success']=false;
             $return['errors']="Caught printing error: $errstr ($errno)";
         } else {
