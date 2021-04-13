@@ -5,6 +5,9 @@ namespace Stanford\iPSCTissueBankWu;
 /** @var \Stanford\iPSCTissueBankWu\iPSCTissueBankWu $module */
 error_reporting( E_ALL ^ ( E_NOTICE | E_WARNING | E_DEPRECATED ) );
 $url = $module->getUrl("update_vials.php");
+$browser_print_js = $module->getUrl("zebra-browser-print-js-v30216/BrowserPrint-3.0.216.min.js");
+$browser_print_zebra = $module->getUrl("zebra-browser-print-js-v30216/BrowserPrint-Zebra-1.0.216.min.js");
+
 $module->emDebug('move report url ' . $url);
 ?>
 
@@ -18,6 +21,9 @@ $module->emDebug('move report url ' . $url);
                 integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl"
                 crossorigin="anonymous"></script>
         <script src="https://cdn.datatables.net/1.10.23/js/jquery.dataTables.min.js"></script>
+        <script src="<?php echo $browser_print_js;?>"></script>
+        <script src="<?php echo $browser_print_zebra;?>"></script>
+
         <style>
             body {
                 width: 90%;
@@ -70,6 +76,7 @@ $module->emDebug('move report url ' . $url);
           function print() {
             var url = '<?php echo $url; ?>';
             let selected = $('#moved_table .selected');//.clone();
+
             let recordInstances = '[';
             selected.each(function() {
               recordInstances += '{"record":"'+$(this).find(':nth-child(2)').text()+'",';
@@ -83,12 +90,22 @@ $module->emDebug('move report url ' . $url);
               data: {"updateType":"printMoved","recordsToSave":recordInstances},
               dataType: 'json',
               success: function (data) {
-                $('#moved_table tbody input[type="checkbox"]:checked').trigger('click');
-                if (data['success']) {
+                  console.log(data.data);
+                  $('#moved_table tbody input[type="checkbox"]:checked').trigger('click');
+                  BrowserPrint.getDefaultDevice("printer", function(device) {
+                      device.send(data.data,
+                          function(success) {
+                              alert('Print request sent to printer.');},
+                          function(error){
+                              alert('Print Error:' + error);
+                          })
+                  });
+
+                /*if (data['success']) {
                   alert('Print request complete.');
                 } else {
                   alert('Print Error:' + data['errors']);
-                }
+                }*/
               },
               error: function (request, error) {
                 $('#moved_table tbody input[type="checkbox"]:checked').trigger('click');

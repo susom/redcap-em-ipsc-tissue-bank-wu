@@ -45,7 +45,6 @@
 				"url": "Pages/moved_report.php",
 				"show-header-and-footer": true
 			}
-
 		],
 		"control-center": [
 
@@ -73,9 +72,14 @@
 			"required": false,
 			"type": "checkbox"
 		},{
-			"key": "printer-ip",
-			"name": "Label Printer IP Address (required) Requires printer setup on local network",
-			"required": true,
+			"key": "horizontal-label-offset",
+			"name": "Horizontal label offset (default = 50 if unset)",
+			"required": false,
+			"type" : "text"
+		},{
+			"key": "vertical-label-offset",
+			"name": "Vertical label offset (default = 15 if unset)",
+			"required": false,
 			"type" : "text"
 		}
 	],

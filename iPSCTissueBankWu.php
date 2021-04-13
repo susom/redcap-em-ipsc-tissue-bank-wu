@@ -531,6 +531,9 @@ and TABLE_TYPE='VIEW'";*/
 
     protected function insertJS()
     {
+        $browser_print_js = $this->getUrl("zebra-browser-print-js-v30216/BrowserPrint-3.0.216.min.js");
+        $browser_print_zebra = $this->getUrl("zebra-browser-print-js-v30216/BrowserPrint-Zebra-1.0.216.min.js");
+
         ?>
       <style type="text/css">
           .<?php echo self::MODULE_VARNAME;?> tbody tr {
@@ -540,6 +543,8 @@ and TABLE_TYPE='VIEW'";*/
           /*.greenhighlight {background-color: inherit !important; }*/
           /*.greenhighlight table td {background-color: inherit !important; }*/
       </style>
+        <script src="<?php echo $browser_print_js;?>"></script>
+        <script src="<?php echo $browser_print_zebra;?>"></script>
       <script type="text/javascript">
         'use strict';
         var <?php echo self::MODULE_VARNAME;?> =
@@ -872,7 +877,15 @@ and TABLE_TYPE='VIEW'";*/
                     data: {"updateType":"print", "tablehtml": '"'+selectedTable.find('tbody').html()+'"'},
                     dataType: 'json',
                     success: function (response) {
-                      //console.log(response);
+                        BrowserPrint.getDefaultDevice("printer", function(device) {
+                            device.send(response.data,
+                                function(success) {
+                                    alert('Print request sent to printer.');},
+                                function(error){
+                                    alert('Print Error:' + error);
+                                })
+                        });
+                        refreshTables();
                       if (!response['success']) {
                         alert('Unable to Print: ' + response['errors']);
                       }

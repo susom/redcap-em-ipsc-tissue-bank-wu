@@ -94,14 +94,25 @@ try {
             return $return;
         }
         $module->emDebug("print query results: " . print_r($result, true));
-
+        $hoffset = $module->getProjectSetting('horizontal-label-offset');
+        if (empty($hoffset)) {
+            $hoffset = 55;
+        } else {
+            $hoffset = intval($hoffset);
+        }
+        $voffset = $module->getProjectSetting('vertical-label-offset');
+        if (empty($hoffset)) {
+            $voffset = 15;
+        } else {
+            $voffset = intval($voffset);
+        }
         $print_data='';
         while ($row = db_fetch_assoc($result)) {
             $module->emDebug('row ' . print_r($row, true));
             $sample_date = date_create($row['sample_date']);
-            $print_data.="^XA^FO10,15^ADN,18,10^FD".date_format($sample_date, 'm/d/Y')."^FS";
-            $print_data.="^FO10,34^ADN,18,10^FDExternal ID ".$row['record']."^FS";
-            $print_data.="^FO10,54^ADN,18,10^FD".$row['freezer_box']."-".$row['freezer_slot']."^FS";
+            $print_data.="^XA^FO$hoffset,$voffset^ADN,18,10^FD".date_format($sample_date, 'm/d/Y')."^FS";
+            $print_data.="^FO$hoffset,".($voffset + 19)."^ADN,18,10^FDExternal ID ".$row['record']."^FS";
+            $print_data.="^FO$hoffset,".($voffset + 39)."^ADN,18,10^FD".$row['freezer_box']."-".$row['freezer_slot']."^FS";
             $desc ='';
             if (strpos($row['type'],'Fibroblast') !== false) {
                 $desc='fb';
@@ -116,14 +127,15 @@ try {
             if (!empty($row['passage'])) {
                 $desc .=" P".$row['passage'];
             }
-            $print_data.="^FO10,73^ADN,18,10^FD".$desc."^FS";
-            $print_data.="^FO10,92^ADN,18,10^FD".$row['vial_id']."^FS";
+            $print_data.="^FO$hoffset,".($voffset + 58)."^ADN,18,10^FD".$desc."^FS";
+            $print_data.="^FO$hoffset,".($voffset + 77)."^ADN,18,10^FD".$row['vial_id']."^FS";
             // Code 128 Bar code
-            $print_data.="^FO5,111^BCN,35,N,N,N,A^FD".$row['vial_id']."^FS";
+            $print_data.="^FO$hoffset,".($voffset + 96)."^BCN,35,N,N,N,A^FD".$row['vial_id']."^FS";
             $print_data.="^XZ";
         }
         $module->emDebug("ZPL:" . $print_data);
-        $fp=fsockopen($module->getProjectSetting('printer-ip'),9100,
+        return $print_data;
+        /*$fp=pfsockopen($module->getProjectSetting('printer-ip'),9100,
             $errno, $errstr, 60);
         $return = [];
         if (!$fp) {
@@ -140,7 +152,7 @@ try {
                 $return['errors']="Printing error: unable to write to port.";
             }
         }
-        return $return;
+        return $return;*/
     }
 
     function cancelPlanned($record, $instances) {
@@ -381,20 +393,25 @@ try {
     else if ($_POST['updateType'] == 'printMoved') {
         $recordsToSave = json_decode($_POST['recordsToSave'], true);
         //$module->emDebug('recordsToSave: '. print_r($recordsToSave, true));
+        $returnData = [];
+        $returnData['success']=true;
+        $returnData['data']='';
         foreach($recordsToSave as $record) {
             $instances = [];
             $instances[]=$record['instance'];
-            $returnData = printLabels($record['record'], $instances);
-            if ($returnData['success']==false) {
+            $returnData['data'] .= printLabels($record['record'], $instances);
+            /*if ($returnData['success']==false) {
                 break;
-            }
+            }*/
         }
         $module->emDebug('move print labels: '.json_encode($returnData));
         echo json_encode($returnData);
     }
     else if ($_POST['updateType'] == 'print') {
         $matches = getRecordIds();
-        $returnData = printLabels($matches['record'][0], $matches['instance']);
+        $returnData=[];
+        $returnData['success']=true;
+        $returnData['data'] = printLabels($matches['record'][0], $matches['instance']);
         echo json_encode($returnData);
     }
     else if ($_POST['updateType'] == 'emptySlotReport') {
