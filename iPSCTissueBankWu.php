@@ -1149,14 +1149,25 @@ and TABLE_TYPE='VIEW'";*/
             return $return;
         }
         $this->emDebug("print query results: " . print_r($result, true));
-
+        $hoffset = $this->getProjectSetting('horizontal-label-offset');
+        if (empty($hoffset)) {
+            $hoffset = 55;
+        } else {
+            $hoffset = intval($hoffset);
+        }
+        $voffset = $this->getProjectSetting('vertical-label-offset');
+        if (empty($hoffset)) {
+            $voffset = 15;
+        } else {
+            $voffset = intval($voffset);
+        }
         $print_data='';
         while ($row = db_fetch_assoc($result)) {
             $this->emDebug('row ' . print_r($row, true));
             $sample_date = date_create($row['sample_date']);
-            $print_data.="^XA^FO10,15^ADN,18,10^FD".date_format($sample_date, 'm/d/Y')."^FS";
-            $print_data.="^FO10,34^ADN,18,10^FDExternal ID ".$row['record']."^FS";
-            $print_data.="^FO10,54^ADN,18,10^FD".$row['freezer_box']."-".$row['freezer_slot']."^FS";
+            $print_data.="^XA^FO$hoffset,$voffset^ADN,18,10^FD".date_format($sample_date, 'm/d/Y')."^FS";
+            $print_data.="^FO$hoffset,".($voffset + 19)."^ADN,18,10^FDExternal ID ".$row['record']."^FS";
+            $print_data.="^FO$hoffset,".($voffset + 39)."^ADN,18,10^FD".$row['freezer_box']."-".$row['freezer_slot']."^FS";
             $desc ='';
             if (strpos($row['type'],'Fibroblast') !== false) {
                 $desc='fb';
@@ -1171,14 +1182,15 @@ and TABLE_TYPE='VIEW'";*/
             if (!empty($row['passage'])) {
                 $desc .=" P".$row['passage'];
             }
-            $print_data.="^FO10,73^ADN,18,10^FD".$desc."^FS";
-            $print_data.="^FO10,92^ADN,18,10^FD".$row['vial_id']."^FS";
+            $print_data.="^FO$hoffset,".($voffset + 58)."^ADN,18,10^FD".$desc."^FS";
+            $print_data.="^FO$hoffset,".($voffset + 77)."^ADN,18,10^FD".$row['vial_id']."^FS";
             // Code 128 Bar code
-            $print_data.="^FO5,111^BCN,35,N,N,N,A^FD".$row['vial_id']."^FS";
+            $print_data.="^FO$hoffset,".($voffset + 96)."^BCN,35,N,N,N,A^FD".$row['vial_id']."^FS";
             $print_data.="^XZ";
         }
         $this->emDebug("ZPL:" . $print_data);
-        $fp=fsockopen($this->getProjectSetting('printer-ip'),9100,
+        return $print_data;
+        /*$fp=pfsockopen($module->getProjectSetting('printer-ip'),9100,
             $errno, $errstr, 60);
         $return = [];
         if (!$fp) {
@@ -1195,7 +1207,8 @@ and TABLE_TYPE='VIEW'";*/
                 $return['errors']="Printing error: unable to write to port.";
             }
         }
-        return $return;
+        return $return;*/
+
     }
 
 }
