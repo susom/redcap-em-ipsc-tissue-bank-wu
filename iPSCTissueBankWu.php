@@ -26,6 +26,9 @@ class iPSCTissueBankWu extends EmInstanceTable
         /*"SELECT TABLE_SCHEMA, TABLE_NAME FROM information_schema.tables where TABLE_SCHEMA='redcap'
 and TABLE_TYPE='VIEW'";*/
         $table_exists = db_query('select 1 from ipsc_wu_all_slots limit 1');
+        $this->emDebug('table_exists '. print_r($table_exists, true));
+        // this worked on local set up but not on production -- had to have table and views explicitly
+        // created by redcap team
         if (empty($table_exists)) {
 
             $num_array = array();
@@ -33,6 +36,8 @@ and TABLE_TYPE='VIEW'";*/
                 $num_array[] = $i;
             }
             $sql = "create table ipsc_wu_numbers as select " . implode($num_array, ' as n union all select ') . ' as n';
+            $this->emDebug('create ipsc_wu_numbers '.$sql);
+
             db_query($sql);
 
             $sql = "create table ipsc_wu_all_slots ";
@@ -43,16 +48,7 @@ and TABLE_TYPE='VIEW'";*/
             db_query($sql);
             $freezers = ['A', 'B', 'D'];
             foreach ($freezers as $freezer) {
-                $sql = "create or replace view ipsc_wu_used_" . strtolower($freezer) .
-                    " as SELECT box.value as box, count(slot.value) as used_slots," .
-                    "group_concat(slot.value) as used_slots_csv FROM redcap_data dist " .
-                    "join redcap_data box on dist.record = box.record and COALESCE(dist.instance, 1) = COALESCE(box.instance, 1) " .
-                    "join redcap_data slot on dist.record = slot.record 
-            and COALESCE(dist.instance, 1) = COALESCE(slot.instance, 1) " .
-                    "where dist.project_id = " . PROJECT_ID .
-                    " and dist.field_name='vial_dist_status' and dist.value in ('0','1') " .
-                    "and box.field_name='vial_freezer_box' and box.value like '" . $freezer . "%' " .
-                    "and slot.field_name='vial_freezer_slot' group by box.value order by box.value";
+                $sql = "CREATE OR REPLACE VIEW ipsc_wu_used_" . strtolower($freezer) ." AS SELECT DISTINCT vial.vial_freezer_box `box`, COUNT(vial.vial_freezer_slot) AS `used_slots`, GROUP_CONCAT( vial.vial_freezer_slot ORDER BY vial.vial_freezer_slot) AS `used_slots_csv` FROM ( SELECT * FROM ( SELECT rd.record red_rec_number, COALESCE(rd.`instance`, 1) AS vial_instance, GROUP_CONCAT( DISTINCT CASE WHEN rd.field_name = 'vial_freezer_box' THEN rd.value END SEPARATOR '\\n') `vial_freezer_box`, GROUP_CONCAT( DISTINCT CASE WHEN rd.field_name = 'vial_freezer_slot' THEN rd.value END SEPARATOR '\\n') `vial_freezer_slot`, GROUP_CONCAT( DISTINCT CASE WHEN rd.field_name = 'vial_dist_status' THEN rd.value END SEPARATOR '\\n') `vial_dist_status` FROM redcap_data rd WHERE rd.project_id = " . PROJECT_ID ." GROUP BY rd.record, vial_instance) t WHERE vial_dist_status IN('0', '1') AND vial_freezer_box LIKE '" . $freezer . "%' " .") vial GROUP BY vial_freezer_box ORDER BY vial_freezer_box";
                 db_query($sql);
                 $this->emDebug('create ipsc_wu_used_' . strtolower($freezer) .' '. $sql);
 
@@ -60,7 +56,6 @@ and TABLE_TYPE='VIEW'";*/
             db_query('drop table ipsc_wu_numbers');
         }
     }
-
 
     protected function setTaggedFields()
     {
@@ -71,13 +66,13 @@ and TABLE_TYPE='VIEW'";*/
             $fieldDetails = $instrumentFields[$repeatingFormDetails['field_name']];
             if (preg_match("/" . self::ACTION_TAG_FILTER . "\s*=\s*\"(.*?)\"\s?/",
                 $fieldDetails['field_annotation'], $matches)) {
-                $this->emDebug('repeatingFormDetails start : ' . print_r($repeatingFormDetails, true));
+                //$this->emDebug('repeatingFormDetails start : ' . print_r($repeatingFormDetails, true));
 
                 $tagFilter = $matches[1];
                 $urlPieces = explode("&", $repeatingFormDetails['ajax_url']);
                 foreach ($urlPieces as $index => $piece) {
                     if (preg_match("/filter=([^&].*)/", $piece, $matches)) {
-                      $this->emDebug('filter matches: '.print_r($matches, true));
+                        //$this->emDebug('filter matches: '.print_r($matches, true));
                         $filter = trim($matches[1]);
                         if (strlen($filter)) {
                             $filter .= ' and ' . '(' . $tagFilter . ')';
@@ -91,13 +86,13 @@ and TABLE_TYPE='VIEW'";*/
                 $repeatingFormDetails['ajax_url'] = implode('&', $urlPieces);
                 $this->taggedFields[$taggedIndex] = $repeatingFormDetails;
             }
-            $this->emDebug('repeatingFormDetails end : ' . print_r($repeatingFormDetails, true));
+            //$this->emDebug('repeatingFormDetails end : ' . print_r($repeatingFormDetails, true));
         }
     }
 
     public function getSelectableInstanceData($record, $event, $form, $filter)
     {
-        $this->emLog('form: ' . $form . ' filter: ' . $filter);
+        //$this->emLog('form: ' . $form . ' filter: ' . $filter);
         $instanceData = $this->getInstanceData($record, $event, $form, $filter, false);
         if (!empty($instanceData)) {
             foreach ($instanceData as $index => $row) {
@@ -109,9 +104,9 @@ and TABLE_TYPE='VIEW'";*/
                 //array_unshift($instanceData[$index], '');
             }
         } else {
-          $instanceData=[];
+            $instanceData=[];
         }
-        $this->emDebug('getSelectableInstanceData $instanceData ' . print_r($instanceData, true));
+        //$this->emDebug('getSelectableInstanceData $instanceData ' . print_r($instanceData, true));
         return $instanceData;
     }
 
@@ -245,7 +240,7 @@ and TABLE_TYPE='VIEW'";*/
     protected function saveVial($record, $sample, $instance, $box, $slot)
     {
         $data = array();
-        $data["red_rec_number"] = $record;
+        $data["red_rec_number"] = '"'.$record.'"';
         $data["redcap_repeat_instrument"] = "vial";
         $data["redcap_repeat_instance"] = $instance;
         $data["vial_freezer_box"] = $box;
@@ -253,7 +248,7 @@ and TABLE_TYPE='VIEW'";*/
         $data["vial_id"] = $this->getNewVialId();
         $data["vial_sample_ref"] = $sample;
         $data["vial_dist_status"] = 0;
-        $this->emDebug('$data: ' . json_encode(array($data)));
+        //$this->emDebug('$data: ' . json_encode(array($data)));
         REDCap::saveData(PROJECT_ID, 'json', json_encode(array($data)));
         return $data;
     }
@@ -261,12 +256,12 @@ and TABLE_TYPE='VIEW'";*/
     public function saveNewVials($record, $sample, $numA, $numB, $numD)
     {
         // get max vial instance for this record and vial ID
-        $sql = "SELECT max(instance) as max_instance from redcap_data where project_id=" . PROJECT_ID
-            . " and record='" . $record . "'";
-        $this->emDebug('max instance $sql is ' . $sql);
+        $sql = "SELECT max(COALESCE(instance,1)) as max_instance from redcap_data where project_id=" . PROJECT_ID
+            . " and record='" . $record . "' and field_name='vial_id'";
+        //$this->emDebug('max instance $sql is ' . $sql);
         $result1 = db_query($sql);
         $row = db_fetch_assoc($result1);
-        $this->emDebug('max instance $row is ' . print_r($row, true));
+        //$this->emDebug('max instance $row is ' . print_r($row, true));
 
         $instance = $row['max_instance']+1;
         $this->emDebug('max instance: ' . $instance);
@@ -296,35 +291,33 @@ and TABLE_TYPE='VIEW'";*/
         return $vials;
     }
 
-    public function redcap_save_record($project_id, $record=null, $instrument, $event_id, $group_id = null,
-                                       $survey_hash = null, $response_id = null, $repeat_instance=1)
-    {
-      if (!empty($_GET['instance'])) {
-        $repeat_instance=$_GET['instance'];
-      }
+    public function redcap_save_record($project_id, $record=null, $instrument,
+           $event_id, $group_id = null, $survey_hash = null,
+           $response_id = null, $repeat_instance=1) {
+        if (!empty($_GET['instance'])) {
+            $repeat_instance=$_GET['instance'];
+        }
         parent::redcap_save_record($project_id, $record, $instrument, $event_id, $group_id, $survey_hash,
             $response_id, $repeat_instance);
         if ($instrument == 'sample') {
             $this->emDebug("repeat_instance: $repeat_instance record: $record getinstance=".$_GET['instance']);
             $sample_data_array = REDCap::getData(PROJECT_ID, 'array',
-            $record, ['smp_new', 'smp_a', 'smp_b', 'smp_d'], null, null, false, false, false,
-             "['redcap_repeat_instance']=" . $repeat_instance,);
-            $this->emDebug('save sample_data_array: ' . print_r($sample_data_array, true));
-
-            /*$sample_data = REDCap::getData(PROJECT_ID, 'json',
                 $record, ['smp_new', 'smp_a', 'smp_b', 'smp_d'], null, null, false, false, false,
-                 "['redcap_repeat_instance']=" . $repeat_instance,);
-            $this->emDebug('save sample_data: ' . $sample_data);
-            $results = json_decode($sample_data, true);
-            $instance_results = $results[$repeat_instance - 1];*/
+                "['redcap_repeat_instance']=" . $repeat_instance,);
+            $this->emDebug('save sample_data_array: ' . print_r($sample_data_array, true));
             $instance_results = $sample_data_array[$record]['repeat_instances'][$event_id][$instrument][$repeat_instance];
             $this->emDebug('save instance_array: ' . print_r($instance_results, true));
 
             if ($instance_results['smp_new']) {
-                $vials = $this->saveNewVials($record, $repeat_instance, $instance_results['smp_a'],
-                    $instance_results['smp_b'], $instance_results['smp_d']);
+                // vials may have already been saved if the labels were printed
+                //if (!empty($instance_results['smp_a']) || !empty($instance_results['smp_b'])
+                //|| !empty($instance_results['smp_d'])) {
+                    $vials = $this->saveNewVials($record, $repeat_instance,
+                        $instance_results['smp_a'],
+                        $instance_results['smp_b'], $instance_results['smp_d']);
+                //}
                 $data = array();
-                $data["red_rec_number"] = $record;
+                $data["red_rec_number"] = '"'.$record.'"';
                 $data["redcap_repeat_instrument"] = "sample";
                 $data["redcap_repeat_instance"] = $repeat_instance;
                 $data["smp_new"] = 0;
@@ -335,50 +328,12 @@ and TABLE_TYPE='VIEW'";*/
                 $this->emDebug('$data to save: ' . json_encode(array($data)));
                 REDCap::saveData(PROJECT_ID, 'json', json_encode(array($data)), 'overwrite');
 
-                /* add printing?
-                if so, $sample_data needs to retrieve smp_type, smp_date_deposited, smp_passage_number,
-                smp_line_id and set exportAsLabels = true
-                 *
-                 * foreach($vials as $index=>$vial) {
-                    //$this->emDebug('$vial ' . print_r($vial, true));
-                    $sample_date = date_create($sample_data['smp_date_deposited']);
-                    $print_data.="^XA^FO10,15^ADN,18,10^FD".date_format($sample_date, 'm/d/Y')."^FS";
-                    $print_data.="^FO10,34^ADN,18,10^FDExternal ID ".$vial['red_rec_number']."^FS";
-                    $print_data.="^FO10,54^ADN,18,10^FD".$vial['vial_freezer_box']
-                        ."-".$vial['vial_freezer_slot']."^FS";
-                    $desc ='';
-                    if (strpos($sample_data['smp_type'],'Fibroblast') !== false) {
-                        $desc='fb';
-                    } else if (stripos($sample_data['smp_type'],'ipsc') !== false) {
-                        $desc='ip';
-                    } else {
-                        $desc=substr($sample_data['smp_type'],0,3);
-                    }
-                    if (!empty($sample_data['line_id'])) {
-                        $desc .=" ".$sample_data['line_id'];
-                    }
-                    if (!empty($sample_data['smp_passage_number'])) {
-                        $desc .=" P".$sample_data['smp_passage_number'];
-                    }
-                    $print_data.="^FO10,73^ADN,18,10^FD".$desc."^FS";
-                    $print_data.="^FO10,92^ADN,18,10^FD".$vial['vial_id']."^FS";
-                    // Code 128 Bar code
-                    $print_data.="^FO5,111^BCN,35,N,N,N,A^FD".$vial['vial_id']."^FS";
-                    $print_data.="^XZ";
+                /* add printing
+                $instances=[];
+                foreach ($vials as $index=>$vial) {
+                    $instances[]=$vial['redcap_repeat_instance'];
                 }
-                $module->emDebug("ZPL:" . $print_data);
-                try
-                {
-                    $fp=pfsockopen($module->getProjectSetting('printer-ip'),9100);
-                    fputs($fp,$print_data);
-                    fclose($fp);
-
-                    echo 'Successfully Printed';
-                }
-                catch (Exception $e)
-                {
-                    echo 'Caught printing exception: ',  $e->getMessage(), "\n";
-                }*/
+                $this->printLabels($record,$instances);*/
             }
         }
     }
@@ -558,7 +513,71 @@ and TABLE_TYPE='VIEW'";*/
           var defaultValueForNewPopup = '<?php echo js_escape($this->defaultValueForNewPopup);?>';
           var update_vials_url = '<?php echo $this->getUrl('update_vials.php') ?>'
 
-        $(document).ready(function () {
+          $.urlParamValue = function (url, name) {
+            var results = new RegExp('[\?&]' + name + '=([^&#]*)')
+              .exec(url);
+            if (results !== null) {
+              return results[1];
+            }
+            return null;
+          }
+
+          $(document).ready(function () {
+            /*  attempt to get confirm popup for printing new sample labels, but
+            doesn't work due to async
+
+            var currentUrl = window.location.href;
+            var saveButtonIds=['submit-btn-saverecord',
+              'submit-btn-savecontinue','submit-btn-savenextinstance',
+              'submit-btn-savenextform','submit-btn-saveexitrecord',
+              'submit-btn-savenextrecord'];
+
+            $.each(saveButtonIds, function(index, saveButtonId) {
+              $('#'+saveButtonId).on('click',function() {
+                if ($('input[name="smp_new___radio"]:checked').val() ==1) {
+                  let rows = $('tr',
+                    $('#EM_InstanceTable_frozen_table_tbl__vial'));
+                  console.log(rows);
+                  simpleDialog('<div style=&quot;margin-top:15px;color:#c00000;font-weight:bold;&quot;>' +
+                    'Print labels?</div>',
+                    'PRINT', null, 600, null,
+                    'Cancel',
+                    function () {
+                      //alert('Printing!');
+
+                      $.ajax({
+                        url: update_vials_url,
+                        timeout: 60000000,
+                        type: 'POST',
+                        data: {"updateType":"printNew",
+                          "pid": '"'+ $.urlParamValue(currentUrl, "pid")+'"',
+                          "record":'"'+ $.urlParamValue(currentUrl, "id")+'"',
+                          "event_id": '"'+ $.urlParamValue(currentUrl, "event_id")+'"',
+                          "instrument": '"'+ $.urlParamValue(currentUrl, "page")+'"',
+                          "instance": '"'+ $.urlParamValue(currentUrl, "instance") +'"',
+                          "smp_a":'"'+ $("input[name=smp_a]").val()+'"',
+                          "smp_b":'"'+ $("input[name=smp_b]").val()+'"',
+                          "smp_d":'"'+ $("input[name=smp_d]").val()+'"'
+                        },
+                        dataType: 'json',
+                        success: function (response) {
+                          //console.log(response);
+                          if (!response['success']) {
+                            alert('Unable to Print: ' + response['errors']);
+                          }
+                        },
+                        error: function (request, error) {
+                          alert('Error occurred: ' + response['errors']);
+                          console.log(request);
+                          console.log(error);
+                        }
+                      });
+                   },
+                    'Print');
+                }
+              });
+
+            });*/
 
             config.forEach(function (taggedField) {
               taggedFieldNames.push(taggedField.field_name);
@@ -598,10 +617,10 @@ and TABLE_TYPE='VIEW'";*/
                         }
                       }
                     }
-                    ,{
+                      ,{
                         'targets': notvisible,
                         'visible': false
-                    }]
+                      }]
                   });
               } else {
                 thisTbl = $('#' + taggedField.html_table_id)
@@ -828,8 +847,8 @@ and TABLE_TYPE='VIEW'";*/
                 '<select class="form-control col-6" id="distStatus">'+
                 '<option value="1">Planned</option><option value="2">Shipped</option></select></div>'+
                 '  <div class="form-group form-row"> <label for="distIrb" class="form-label col-3">'+
-                  'IRB Num:</label>'+
-                  '<input type="text" class="form-control col-2" id="distIrb"></input>'+
+                'IRB Num:</label>'+
+                '<input type="text" class="form-control col-2" id="distIrb"></input>'+
                 '  <label for="distIrbExp" class="form-label col-2">'+
                 'IRB Exp Date:</label>'+
                 '<input type="text" class="form-control col-2" id="distIrbExp"></input></div>',
@@ -904,11 +923,11 @@ and TABLE_TYPE='VIEW'";*/
               simpleDialog('<table class="table table-striped table-bordered table-condensed">'
                 + selectedTable.html() + '</table>' +
                 '<div style=&quot;margin-top:15px;color:#c00000;font-weight:bolder;&quot;>' +
-            '  <div class="form-group form-row"> <label for="moveToFreezer" class="form-label col-6">'+
-              'Move the selected vials to Freezer Box:</label>'+
-              '<select class="form-control col-2" id="moveToFreezer">'+
-              '<option>A</option><option>B</option><option>D</option>'+
-              '</select></div></div>' ,
+                '  <div class="form-group form-row"> <label for="moveToFreezer" class="form-label col-6">'+
+                'Move the selected vials to Freezer Box:</label>'+
+                '<select class="form-control col-2" id="moveToFreezer">'+
+                '<option>A</option><option>B</option><option>D</option>'+
+                '</select></div></div>' ,
                 'MOVE VIALS', null, 600, null,
                 'Cancel',
                 function () {
@@ -1068,24 +1087,115 @@ and TABLE_TYPE='VIEW'";*/
                 . $tableElementId . '\');" disabled><span class="fas fa-minus-circle" aria-hidden="true"></span>&nbsp;Cancel Distribution</button>'; // Cancel vial distribution
             $html .= '</div>';
         } else {
-          return parent::makeHtmlTable($tableElementId, $tableFormClass,
-              $eventId, $formName, $canEdit, $scrollX);
+            return parent::makeHtmlTable($tableElementId, $tableFormClass,
+                $eventId, $formName, $canEdit, $scrollX);
         }
         return $html;
     }
 
-    /*public function redcap_every_page_before_render($project_id)
-    {
-      parent::redcap_every_page_before_render($project_id);
-        if (PAGE === 'DataEntry/index.php'
-            && isset($_GET['extmod_instance_table'])
-            && isset($_GET['extmod_instance_table_add_new'])
-            && $_GET['page']==='vial') {
-            $_GET['new_vial'] = $this->getNewVialId();
+    function printLabels($record, $instances) {
+        $return = [];
+        $sql="select distinct COALESCE (sample.red_rec_number,'') `record`,
+            COALESCE (sample.sample_instance,'') `instance`,
+            COALESCE (sample.smp_date_deposited,'') `sample_date`,
+            COALESCE (sample.smp_line_id,'') `line`,
+            COALESCE (sample.smp_type,'') `type`,
+            COALESCE (sample.smp_passage_number,'') `passage`,
+            COALESCE (vial.vial_id,'') `vial_id`,
+            COALESCE (vial.vial_freezer_box,'') `freezer_box`,
+            COALESCE (vial.vial_freezer_slot,'') `freezer_slot`
+        FROM ((select * from (select rd.record  red_rec_number ,
+            COALESCE(rd.`instance`, 1) as sample_instance,
+            group_concat(distinct case when rd.field_name = 'smp_type' then
+                substring(md.element_enum, instr(md.element_enum, rd.value) + length(rd.value) + 2,
+            locate('\\\\n',
+                md.element_enum,
+                instr(md.element_enum, rd.value) + length(rd.value))-(instr(md.element_enum, rd.value) + length(rd.value) + 2)) end separator '\\n') as `smp_type`,
+            group_concat(distinct case when rd.field_name = 'smp_date_deposited'
+                then rd.value end separator '\\n') `smp_date_deposited`,
+            group_concat(distinct case when rd.field_name = 'smp_passage_number'
+                then rd.value end separator '\\n') `smp_passage_number`,
+            group_concat(distinct case when rd.field_name = 'smp_line_id'
+                then rd.value end separator '\\n') `smp_line_id`
+      FROM redcap_data rd JOIN redcap_metadata md
+          ON md.project_id = rd.project_id
+             AND md.field_name = rd.field_name AND md.form_name='sample'
+      WHERE rd.project_id = ".PROJECT_ID.
+            " AND rd.record = " . $record .
+            " GROUP BY rd.record, sample_instance) t   ) sample INNER JOIN
+        (select * from (select rd.record  red_rec_number ,
+        COALESCE(rd.`instance`, 1) as vial_instance,
+        group_concat(distinct case when rd.field_name = 'vial_sample_ref'
+            then rd.value end separator '\\n') `vial_sample_ref`,
+        group_concat(distinct case when rd.field_name = 'vial_id'
+            then rd.value end separator '\\n') `vial_id`,
+        group_concat(distinct case when rd.field_name = 'vial_freezer_box'
+            then rd.value end separator '\\n') `vial_freezer_box`,
+        group_concat(distinct case when rd.field_name = 'vial_freezer_slot'
+            then rd.value end separator '\\n') `vial_freezer_slot`
+      FROM redcap_data rd
+      WHERE rd.project_id = ".PROJECT_ID.
+            " AND rd.record = " . $record .
+            " AND COALESCE(rd.instance,1) in (" . implode(",", $instances).")".
+          " GROUP BY rd.record, vial_instance) t ) vial
+        ON sample.red_rec_number=vial.red_rec_number AND vial_sample_ref = sample_instance )
+        ORDER BY freezer_box, freezer_slot";
+        $this->emDebug("print query sql: " .$sql);
+
+        $result = db_query($sql);
+        if (!$result || $result->num_rows === 0) {
+            $return['success'] = false;
+            $return['errors'] = 'Unable to retrieve sample data for print request';
+            return $return;
         }
+        $this->emDebug("print query results: " . print_r($result, true));
 
-    }*/
-
-
+        $print_data='';
+        while ($row = db_fetch_assoc($result)) {
+            $this->emDebug('row ' . print_r($row, true));
+            $sample_date = date_create($row['sample_date']);
+            $print_data.="^XA^FO10,15^ADN,18,10^FD".date_format($sample_date, 'm/d/Y')."^FS";
+            $print_data.="^FO10,34^ADN,18,10^FDExternal ID ".$row['record']."^FS";
+            $print_data.="^FO10,54^ADN,18,10^FD".$row['freezer_box']."-".$row['freezer_slot']."^FS";
+            $desc ='';
+            if (strpos($row['type'],'Fibroblast') !== false) {
+                $desc='fb';
+            } else if (stripos($row['type'],'ipsc') !== false) {
+                $desc='ip';
+            } else {
+                $desc=substr($row['type'],0,3);
+            }
+            if (!empty($row['line'])) {
+                $desc .=" ".$row['line'];
+            }
+            if (!empty($row['passage'])) {
+                $desc .=" P".$row['passage'];
+            }
+            $print_data.="^FO10,73^ADN,18,10^FD".$desc."^FS";
+            $print_data.="^FO10,92^ADN,18,10^FD".$row['vial_id']."^FS";
+            // Code 128 Bar code
+            $print_data.="^FO5,111^BCN,35,N,N,N,A^FD".$row['vial_id']."^FS";
+            $print_data.="^XZ";
+        }
+        $this->emDebug("ZPL:" . $print_data);
+        $fp=fsockopen($this->getProjectSetting('printer-ip'),9100,
+            $errno, $errstr, 60);
+        $return = [];
+        if (!$fp) {
+            $this->emDebug("print error: $errstr ($errno)");
+            $return['success']=false;
+            $return['errors']="Caught printing error: $errstr ($errno)";
+        } else {
+            $ret = fputs($fp,$print_data);
+            fclose($fp);
+            if ($ret) {
+                $return['success'] = true;
+            } else {
+                $return['success']=false;
+                $return['errors']="Printing error: unable to write to port.";
+            }
+        }
+        return $return;
+    }
 
 }

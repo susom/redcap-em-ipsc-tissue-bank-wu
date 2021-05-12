@@ -2,12 +2,9 @@
 
 namespace Stanford\iPSCTissueBankWu;
 
-
-
 use LogicException;
 use REDCap;
 /** @var \Stanford\iPSCTissueBankWu\iPSCTissueBankWu $module */
-
 
 error_reporting(E_ALL ^ (E_NOTICE | E_WARNING | E_DEPRECATED));
 
@@ -38,123 +35,6 @@ try {
         return $matches;
     }
 
-    function printLabels($record, $instances) {
-        global $module;
-        $return = [];
-        $sql="select distinct COALESCE (sample.red_rec_number,'') `record`,
-            COALESCE (sample.sample_instance,'') `instance`,
-            COALESCE (sample.smp_date_deposited,'') `sample_date`,
-            COALESCE (sample.smp_line_id,'') `line`,
-            COALESCE (sample.smp_type,'') `type`,
-            COALESCE (sample.smp_passage_number,'') `passage`,
-            COALESCE (vial.vial_id,'') `vial_id`,
-            COALESCE (vial.vial_freezer_box,'') `freezer_box`,
-            COALESCE (vial.vial_freezer_slot,'') `freezer_slot`
-        FROM ((select * from (select rd.record  red_rec_number ,
-            COALESCE(rd.`instance`, 1) as sample_instance,
-            group_concat(distinct case when rd.field_name = 'smp_type' then
-                substring(md.element_enum, instr(md.element_enum, rd.value) + length(rd.value) + 2,
-            locate('\\\\n',
-                md.element_enum,
-                instr(md.element_enum, rd.value) + length(rd.value))-(instr(md.element_enum, rd.value) + length(rd.value) + 2)) end separator '\\n') as `smp_type`,
-            group_concat(distinct case when rd.field_name = 'smp_date_deposited'
-                then rd.value end separator '\\n') `smp_date_deposited`,
-            group_concat(distinct case when rd.field_name = 'smp_passage_number'
-                then rd.value end separator '\\n') `smp_passage_number`,
-            group_concat(distinct case when rd.field_name = 'smp_line_id'
-                then rd.value end separator '\\n') `smp_line_id`
-      FROM redcap_data rd JOIN redcap_metadata md
-          ON md.project_id = rd.project_id
-             AND md.field_name = rd.field_name AND md.form_name='sample'
-      WHERE rd.project_id = ".PROJECT_ID.
-            " AND rd.record = " . $record .
-            " GROUP BY rd.record, sample_instance) t   ) sample INNER JOIN
-        (select * from (select rd.record  red_rec_number ,
-        COALESCE(rd.`instance`, 1) as vial_instance,
-        group_concat(distinct case when rd.field_name = 'vial_sample_ref'
-            then rd.value end separator '\\n') `vial_sample_ref`,
-        group_concat(distinct case when rd.field_name = 'vial_id'
-            then rd.value end separator '\\n') `vial_id`,
-        group_concat(distinct case when rd.field_name = 'vial_freezer_box'
-            then rd.value end separator '\\n') `vial_freezer_box`,
-        group_concat(distinct case when rd.field_name = 'vial_freezer_slot'
-            then rd.value end separator '\\n') `vial_freezer_slot`
-      FROM redcap_data rd
-      WHERE rd.project_id = ".PROJECT_ID.
-            " AND rd.record = " . $record .
-            " AND rd.instance in (" . implode(",", $instances).")".
-            " GROUP BY rd.record, vial_instance) t ) vial
-        ON sample.red_rec_number=vial.red_rec_number AND vial_sample_ref = sample_instance )";
-        $module->emDebug("print query sql: " .$sql);
-
-        $result = db_query($sql);
-        if (!$result || $result->num_rows === 0) {
-            $return['success'] = false;
-            $return['errors'] = 'Unable to retrieve sample data for print request';
-            return $return;
-        }
-        $module->emDebug("print query results: " . print_r($result, true));
-        $hoffset = $module->getProjectSetting('horizontal-label-offset');
-        if (empty($hoffset)) {
-            $hoffset = 55;
-        } else {
-            $hoffset = intval($hoffset);
-        }
-        $voffset = $module->getProjectSetting('vertical-label-offset');
-        if (empty($hoffset)) {
-            $voffset = 15;
-        } else {
-            $voffset = intval($voffset);
-        }
-        $print_data='';
-        while ($row = db_fetch_assoc($result)) {
-            $module->emDebug('row ' . print_r($row, true));
-            $sample_date = date_create($row['sample_date']);
-            $print_data.="^XA^FO$hoffset,$voffset^ADN,18,10^FD".date_format($sample_date, 'm/d/Y')."^FS";
-            $print_data.="^FO$hoffset,".($voffset + 19)."^ADN,18,10^FDExternal ID ".$row['record']."^FS";
-            $print_data.="^FO$hoffset,".($voffset + 39)."^ADN,18,10^FD".$row['freezer_box']."-".$row['freezer_slot']."^FS";
-            $desc ='';
-            if (strpos($row['type'],'Fibroblast') !== false) {
-                $desc='fb';
-            } else if (stripos($row['type'],'ipsc') !== false) {
-                $desc='ip';
-            } else {
-                $desc=substr($row['type'],0,3);
-            }
-            if (!empty($row['line'])) {
-                $desc .=" ".$row['line'];
-            }
-            if (!empty($row['passage'])) {
-                $desc .=" P".$row['passage'];
-            }
-            $print_data.="^FO$hoffset,".($voffset + 58)."^ADN,18,10^FD".$desc."^FS";
-            $print_data.="^FO$hoffset,".($voffset + 77)."^ADN,18,10^FD".$row['vial_id']."^FS";
-            // Code 128 Bar code
-            $print_data.="^FO$hoffset,".($voffset + 96)."^BCN,35,N,N,N,A^FD".$row['vial_id']."^FS";
-            $print_data.="^XZ";
-        }
-        $module->emDebug("ZPL:" . $print_data);
-        return $print_data;
-        /*$fp=pfsockopen($module->getProjectSetting('printer-ip'),9100,
-            $errno, $errstr, 60);
-        $return = [];
-        if (!$fp) {
-            $module->emDebug("print error: $errstr ($errno)");
-            $return['success']=false;
-            $return['errors']="Caught printing error: $errstr ($errno)";
-        } else {
-            $ret = fputs($fp,$print_data);
-            fclose($fp);
-            if ($ret) {
-                $return['success'] = true;
-            } else {
-                $return['success']=false;
-                $return['errors']="Printing error: unable to write to port.";
-            }
-        }
-        return $return;*/
-    }
-
     function cancelPlanned($record, $instances) {
         global $module;
         if (strpos($record, "'") === -1 && strpos($record, '"') === -1) {
@@ -162,9 +42,10 @@ try {
         }
         $sql = "select instance from redcap_data where project_id=" . PROJECT_ID .
             " and record=" . $record .
-            " and instance in (" . implode(',', $instances) . ")" .
             " and field_name ='vial_dist_status'" .
-            " and value ='2'";
+            " and value ='2'".
+            " and COALESCE(instance,1) in (" . implode(',', $instances) . ")" ;
+
         $module->emDebug('cancel query sql: ' . $sql);
 
         $result1 = db_query($sql);
@@ -178,7 +59,7 @@ try {
         } else {
             $jsonData = [];
             foreach ($instances as $instance) {
-                $json = '{"red_rec_number":' . str_replace('\'', '', $record) . ',';
+                $json = '{"red_rec_number":"' . str_replace('\'', '', $record) . '",';
                 $json .= '"redcap_repeat_instrument":"vial",';
                 $json .= '"redcap_repeat_instance":' . $instance . ',';
                 $json .= '"vial_dist_by":"",';
@@ -286,7 +167,7 @@ try {
             " and event_id =" . $matches['event_id'][0] .
             " and field_name in ('".implode("','",array_keys($dataDictionary))."','vial_complete')".
             " and record=" . $matches['record'][0] .
-            " and instance in (" . implode(',', $matches['instance']) . ")";
+            " and COALESCE(instance,1) in (" . implode(',', $matches['instance']) . ")";
         $module->emDebug('delete sql: ' . $sql);
         if (db_query($sql)) {
             echo '{"success":true, "data":[]}';
@@ -329,7 +210,7 @@ try {
 
         $jsonData = [];
         foreach($matches['instance'] as $instance) {
-            $json ='{"red_rec_number":'.str_replace('\'','',$matches['record'][0]).',';
+            $json ='{"red_rec_number":"'.str_replace('\'','',$matches['record'][0]).'",';
             $json .='"redcap_repeat_instrument":"vial",';
             $json .='"redcap_repeat_instance":'.$instance.',';
             $json .='"vial_dist_by":"'. $updateValues['vial_dist_by'].'",';
@@ -356,9 +237,9 @@ try {
         $module->emDebug('matches: ' . print_r($matches, true));
         $sql = "select instance from redcap_data where project_id=" . PROJECT_ID .
             " and record=" . $matches['record'][0] .
-            " and instance in (" . implode(',', $matches['instance']) . ")" .
             " and field_name ='vial_dist_status'" .
-            " and value ='2'";
+            " and value ='2'" .
+            " and COALESCE(instance,1) in (" . implode(',', $matches['instance']) . ")" ;
         $module->emDebug('cancel query sql: ' . $sql);
 
         $result1 = db_query($sql);
@@ -371,7 +252,7 @@ try {
 
         $jsonData = [];
         for ($i = 0; $i < $numSlots; $i++) {
-            $json ='{"red_rec_number":'.str_replace('\'','',$matches['record'][0]).',';
+            $json ='{"red_rec_number":"'.str_replace('\'','',$matches['record'][0]).'",';
             $json .='"redcap_repeat_instrument":"vial",';
             $json .='"redcap_repeat_instance":'.$matches['instance'][$i].',';
             $json .='"vial_freezer_box":"'. $freezerSpace['box'].'",';
@@ -399,6 +280,7 @@ try {
         foreach($recordsToSave as $record) {
             $instances = [];
             $instances[]=$record['instance'];
+            $returnData = $module->printLabels($record['record'], $instances);
             $returnData['data'] .= printLabels($record['record'], $instances);
             /*if ($returnData['success']==false) {
                 break;
@@ -411,7 +293,29 @@ try {
         $matches = getRecordIds();
         $returnData=[];
         $returnData['success']=true;
-        $returnData['data'] = printLabels($matches['record'][0], $matches['instance']);
+        $returnData['data'] = $module->printLabels($matches['record'][0], $matches['instance']);
+        echo json_encode($returnData);
+    }
+    else if ($_POST['updateType'] == 'printNew') {
+        $vials = $module->saveNewVials($_POST['record'], $_POST['instance'], $_POST['smp_a'],
+            $_POST['smp_b'], $_POST['smp_d']);
+        $data = array();
+        $data["red_rec_number"] = $_POST['record'];
+        $data["redcap_repeat_instrument"] = "sample";
+        $data["redcap_repeat_instance"] = $_POST['instance'];
+        $data["smp_a"] = "";
+        $data["smp_b"] = "";
+        $data["smp_d"] = "";
+        $this->emDebug('printNew $data to save: ' . json_encode(array($data)));
+        REDCap::saveData(PROJECT_ID, 'json', json_encode(array($data)), 'overwrite');
+
+        $instances=[];
+        foreach ($vials as $vial) {
+            $instances[]=$vial['redcap_repeat_instance'];
+        }
+        $returnData=[];
+        $returnData['success']=true;
+        $returnData['data'] = $module->printLabels($_POST['record'], $instances);
         echo json_encode($returnData);
     }
     else if ($_POST['updateType'] == 'emptySlotReport') {
