@@ -33,3 +33,23 @@ The EM includes two custom reports
   report.
 * The Empty Slot Report - reports available freezer slots
 * The Moved Report - reports moved and previous location of vials
+
+The EM relies on installation of the [Zebra Browser Driver](https://www.zebra.com/us/en/products/software/barcode-printers/link-os/browser-print.html) on the machine on which the EM is being 
+used.  In addition, the machine must have the networked printer installed.  Unforunately, Zebra does not provide 
+a Mac OS driver and the 3rd party driver does not work well.  
+
+To connect the computer to the wireless Zebra printer:
+1. Under Settings/Printers & Devices, select "The printer that I want isn't listed"
+1. Select "Add a printer or network printer with manual settings"
+1. Select "Create a new port", type "Standard TCP/IP Port"
+1. Enter the printer IP address and give the printer a name
+1. Additional port information required, select "Custom"
+1. Select "Raw" protocol, enter 9100 for port number
+1. Select ZDesigner, ZDesigner ZD420 203dpi ZPL (or whatever the printer model is.  Make sure to select "ZPL" and 
+   the correct dpi)
+   
+To configure the Zebra Browser Driver:
+1. Select the wireless zebra printer as the default printer
+1. When printing for the first time, the browser printer driver will ask for access.
+1. When active the Zebra Browser Driver will have a small zebra icon in the Windows Application Tray.
+

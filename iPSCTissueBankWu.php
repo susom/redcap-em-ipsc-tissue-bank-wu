@@ -240,7 +240,7 @@ and TABLE_TYPE='VIEW'";*/
     protected function saveVial($record, $sample, $instance, $box, $slot)
     {
         $data = array();
-        $data["red_rec_number"] = '"'.$record.'"';
+        $data["red_rec_number"] = $record;
         $data["redcap_repeat_instrument"] = "vial";
         $data["redcap_repeat_instance"] = $instance;
         $data["vial_freezer_box"] = $box;
@@ -291,6 +291,53 @@ and TABLE_TYPE='VIEW'";*/
         return $vials;
     }
 
+    public function redcap_every_page_top($project_id) {
+        //if (PAGE == 'DataEntry/record_home.php' && isset($_COOKIE['printrecord']))
+        if (isset($_COOKIE['printrecord']))
+
+        {
+            $record = htmlspecialchars($_COOKIE['printrecord']);
+            $vial_instances = explode(',',htmlspecialchars($_COOKIE['printvials']));
+            $zpl=$this->printLabels($record, $vial_instances);
+            $browser_print_js = $this->getUrl("zebra-browser-print-js-v30216/BrowserPrint-3.0.216.min.js");
+            $browser_print_zebra = $this->getUrl("zebra-browser-print-js-v30216/BrowserPrint-Zebra-1.0.216.min.js");
+            setcookie('printrecord', '',1);
+            setcookie('printvials', '',1);
+            print '<div class="yellow">Special announcement text to display at the top
+            of every data entry form.</div>';
+            ?>
+          <script src="<?php echo $browser_print_js;?>"></script>
+          <script src="<?php echo $browser_print_zebra;?>"></script>
+          <script type="text/javascript">
+            'use strict';
+            $(document).ready(function () {
+                  <?php echo $this->getPrintDialog($zpl);?>
+              });
+          </script>
+            <?php
+
+        }
+    }
+
+    private function getPrintDialog($zpl) {
+      return "simpleDialog('<div style=&quot;margin-top:15px;color:#c00000;font-weight:bold;&quot;>' +
+                    'Print labels?</div>',
+                    'PRINT', null, 600, null,
+                    'Cancel',
+                    function () {
+              BrowserPrint.getDefaultDevice('printer', function (device) {
+                device.send('$zpl',
+                  function (success) {
+                    alert('Print request sent to printer.');
+                  },
+                  function (error) {
+                    alert('Print Error:' + error);
+                  })
+              });
+                   },
+                    'Print');";
+    }
+
     public function redcap_save_record($project_id, $record=null, $instrument,
            $event_id, $group_id = null, $survey_hash = null,
            $response_id = null, $repeat_instance=1) {
@@ -306,18 +353,15 @@ and TABLE_TYPE='VIEW'";*/
                 "['redcap_repeat_instance']=" . $repeat_instance,);
             $this->emDebug('save sample_data_array: ' . print_r($sample_data_array, true));
             $instance_results = $sample_data_array[$record]['repeat_instances'][$event_id][$instrument][$repeat_instance];
-            $this->emDebug('save instance_array: ' . print_r($instance_results, true));
 
             if ($instance_results['smp_new']) {
-                // vials may have already been saved if the labels were printed
-                //if (!empty($instance_results['smp_a']) || !empty($instance_results['smp_b'])
-                //|| !empty($instance_results['smp_d'])) {
-                    $vials = $this->saveNewVials($record, $repeat_instance,
+                $this->emDebug('save instance_array: ' . print_r($instance_results, true));
+                $vials = $this->saveNewVials($record, $repeat_instance,
                         $instance_results['smp_a'],
                         $instance_results['smp_b'], $instance_results['smp_d']);
-                //}
+
                 $data = array();
-                $data["red_rec_number"] = '"'.$record.'"';
+                $data["red_rec_number"] = $record;
                 $data["redcap_repeat_instrument"] = "sample";
                 $data["redcap_repeat_instance"] = $repeat_instance;
                 $data["smp_new"] = 0;
@@ -328,12 +372,13 @@ and TABLE_TYPE='VIEW'";*/
                 $this->emDebug('$data to save: ' . json_encode(array($data)));
                 REDCap::saveData(PROJECT_ID, 'json', json_encode(array($data)), 'overwrite');
 
-                /* add printing
+                // add printing
                 $instances=[];
                 foreach ($vials as $index=>$vial) {
                     $instances[]=$vial['redcap_repeat_instance'];
                 }
-                $this->printLabels($record,$instances);*/
+                setcookie('printrecord', $record);
+                setcookie('printvials', implode(',', $instances));
             }
         }
     }
@@ -486,6 +531,14 @@ and TABLE_TYPE='VIEW'";*/
 
     protected function insertJS()
     {
+       /* $zpl='';
+        if (PAGE == isset($_COOKIE['printrecord'])) {
+            $record = htmlspecialchars($_COOKIE['printrecord']);
+            $vial_instances = explode(',', htmlspecialchars($_COOKIE['printvials']));
+            $zpl = $this->printLabels($record, $vial_instances);
+        }
+        setcookie('printrecord', '',1);
+        setcookie('printvials', '',1);*/
         $browser_print_js = $this->getUrl("zebra-browser-print-js-v30216/BrowserPrint-3.0.216.min.js");
         $browser_print_zebra = $this->getUrl("zebra-browser-print-js-v30216/BrowserPrint-Zebra-1.0.216.min.js");
 
@@ -523,62 +576,6 @@ and TABLE_TYPE='VIEW'";*/
           }
 
           $(document).ready(function () {
-            /*  attempt to get confirm popup for printing new sample labels, but
-            doesn't work due to async
-
-            var currentUrl = window.location.href;
-            var saveButtonIds=['submit-btn-saverecord',
-              'submit-btn-savecontinue','submit-btn-savenextinstance',
-              'submit-btn-savenextform','submit-btn-saveexitrecord',
-              'submit-btn-savenextrecord'];
-
-            $.each(saveButtonIds, function(index, saveButtonId) {
-              $('#'+saveButtonId).on('click',function() {
-                if ($('input[name="smp_new___radio"]:checked').val() ==1) {
-                  let rows = $('tr',
-                    $('#EM_InstanceTable_frozen_table_tbl__vial'));
-                  console.log(rows);
-                  simpleDialog('<div style=&quot;margin-top:15px;color:#c00000;font-weight:bold;&quot;>' +
-                    'Print labels?</div>',
-                    'PRINT', null, 600, null,
-                    'Cancel',
-                    function () {
-                      //alert('Printing!');
-
-                      $.ajax({
-                        url: update_vials_url,
-                        timeout: 60000000,
-                        type: 'POST',
-                        data: {"updateType":"printNew",
-                          "pid": '"'+ $.urlParamValue(currentUrl, "pid")+'"',
-                          "record":'"'+ $.urlParamValue(currentUrl, "id")+'"',
-                          "event_id": '"'+ $.urlParamValue(currentUrl, "event_id")+'"',
-                          "instrument": '"'+ $.urlParamValue(currentUrl, "page")+'"',
-                          "instance": '"'+ $.urlParamValue(currentUrl, "instance") +'"',
-                          "smp_a":'"'+ $("input[name=smp_a]").val()+'"',
-                          "smp_b":'"'+ $("input[name=smp_b]").val()+'"',
-                          "smp_d":'"'+ $("input[name=smp_d]").val()+'"'
-                        },
-                        dataType: 'json',
-                        success: function (response) {
-                          //console.log(response);
-                          if (!response['success']) {
-                            alert('Unable to Print: ' + response['errors']);
-                          }
-                        },
-                        error: function (request, error) {
-                          alert('Error occurred: ' + response['errors']);
-                          console.log(request);
-                          console.log(error);
-                        }
-                      });
-                   },
-                    'Print');
-                }
-              });
-
-            });*/
-
             config.forEach(function (taggedField) {
               taggedFieldNames.push(taggedField.field_name);
               $('#' + taggedField.field_name + '-tr td:last')
@@ -696,10 +693,7 @@ and TABLE_TYPE='VIEW'";*/
                 // Update state of "Select all" control
                 updateDataTableSelectAllCtrl(thisTbl);
               });
-
-
             });
-
             // override global function doGreenHighlight() so we can skip the descriptive text fields with tables
             var globalDoGreenHighlight = doGreenHighlight;
             doGreenHighlight = function (rowob) {
@@ -708,6 +702,7 @@ and TABLE_TYPE='VIEW'";*/
               }
             };
 
+              //<php if (!empty($zpl)) echo $this->getPrintDialog($zpl); ?>
           });
 
           function instancePopup(title, record, event, form, instance) {
@@ -1190,24 +1185,7 @@ and TABLE_TYPE='VIEW'";*/
         }
         $this->emDebug("ZPL:" . $print_data);
         return $print_data;
-        /*$fp=pfsockopen($module->getProjectSetting('printer-ip'),9100,
-            $errno, $errstr, 60);
-        $return = [];
-        if (!$fp) {
-            $this->emDebug("print error: $errstr ($errno)");
-            $return['success']=false;
-            $return['errors']="Caught printing error: $errstr ($errno)";
-        } else {
-            $ret = fputs($fp,$print_data);
-            fclose($fp);
-            if ($ret) {
-                $return['success'] = true;
-            } else {
-                $return['success']=false;
-                $return['errors']="Printing error: unable to write to port.";
-            }
-        }
-        return $return;*/
+
 
     }
 

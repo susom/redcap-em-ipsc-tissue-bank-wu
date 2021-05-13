@@ -17,6 +17,7 @@
 
 	"permissions": [
 		"redcap_every_page_before_render",
+		"redcap_every_page_top",
 		"redcap_data_entry_form_top",
 		"redcap_survey_page_top",
 		"redcap_save_record"
@@ -43,6 +44,12 @@
 				"name": "Moved Report",
 				"icon": "gear",
 				"url": "Pages/moved_report.php",
+				"show-header-and-footer": true
+			},
+			{
+				"name": "iPSC Tissue Bank - README",
+				"icon": "gear",
+				"url": "Pages/zebra_setup.pdf",
 				"show-header-and-footer": true
 			}
 		],
