@@ -531,14 +531,6 @@ and TABLE_TYPE='VIEW'";*/
 
     protected function insertJS()
     {
-       /* $zpl='';
-        if (PAGE == isset($_COOKIE['printrecord'])) {
-            $record = htmlspecialchars($_COOKIE['printrecord']);
-            $vial_instances = explode(',', htmlspecialchars($_COOKIE['printvials']));
-            $zpl = $this->printLabels($record, $vial_instances);
-        }
-        setcookie('printrecord', '',1);
-        setcookie('printvials', '',1);*/
         $browser_print_js = $this->getUrl("zebra-browser-print-js-v30216/BrowserPrint-3.0.216.min.js");
         $browser_print_zebra = $this->getUrl("zebra-browser-print-js-v30216/BrowserPrint-Zebra-1.0.216.min.js");
 
@@ -701,8 +693,6 @@ and TABLE_TYPE='VIEW'";*/
                 globalDoGreenHighlight(rowob);
               }
             };
-
-              //<php if (!empty($zpl)) echo $this->getPrintDialog($zpl); ?>
           });
 
           function instancePopup(title, record, event, form, instance) {
@@ -1134,7 +1124,7 @@ and TABLE_TYPE='VIEW'";*/
             " AND COALESCE(rd.instance,1) in (" . implode(",", $instances).")".
           " GROUP BY rd.record, vial_instance) t ) vial
         ON sample.red_rec_number=vial.red_rec_number AND vial_sample_ref = sample_instance )
-        ORDER BY freezer_box, freezer_slot";
+        ORDER BY freezer_box desc, freezer_slot desc";
         $this->emDebug("print query sql: " .$sql);
 
         $result = db_query($sql);
@@ -1160,9 +1150,9 @@ and TABLE_TYPE='VIEW'";*/
         while ($row = db_fetch_assoc($result)) {
             $this->emDebug('row ' . print_r($row, true));
             $sample_date = date_create($row['sample_date']);
-            $print_data.="^XA^FO$hoffset,$voffset^ADN,18,10^FD".date_format($sample_date, 'm/d/Y')."^FS";
-            $print_data.="^FO$hoffset,".($voffset + 19)."^ADN,18,10^FDExternal ID ".$row['record']."^FS";
-            $print_data.="^FO$hoffset,".($voffset + 39)."^ADN,18,10^FD".$row['freezer_box']."-".$row['freezer_slot']."^FS";
+            $print_data.="^XA^FO$hoffset,$voffset^A0N,18^FD".date_format($sample_date, 'm/d/Y')."^FS";
+            $print_data.="^FO$hoffset,".($voffset + 19)."^A0N,18^FDExternal ID ".$row['record']."^FS";
+            $print_data.="^FO$hoffset,".($voffset + 39)."^A0N,18^FD".$row['freezer_box']."-".$row['freezer_slot']."^FS";
             $desc ='';
             if (strpos($row['type'],'Fibroblast') !== false) {
                 $desc='fb';
@@ -1177,8 +1167,8 @@ and TABLE_TYPE='VIEW'";*/
             if (!empty($row['passage'])) {
                 $desc .=" P".$row['passage'];
             }
-            $print_data.="^FO$hoffset,".($voffset + 58)."^ADN,18,10^FD".$desc."^FS";
-            $print_data.="^FO$hoffset,".($voffset + 77)."^ADN,18,10^FD".$row['vial_id']."^FS";
+            $print_data.="^FO$hoffset,".($voffset + 58)."^A0N,18^FD".$desc."^FS";
+            $print_data.="^FO$hoffset,".($voffset + 77)."^A0N,18^FD".$row['vial_id']."^FS";
             // Code 128 Bar code
             $print_data.="^FO$hoffset,".($voffset + 96)."^BCN,35,N,N,N,A^FD".$row['vial_id']."^FS";
             $print_data.="^XZ";
