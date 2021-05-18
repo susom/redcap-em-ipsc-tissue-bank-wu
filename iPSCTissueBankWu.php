@@ -26,7 +26,7 @@ class iPSCTissueBankWu extends EmInstanceTable
         /*"SELECT TABLE_SCHEMA, TABLE_NAME FROM information_schema.tables where TABLE_SCHEMA='redcap'
 and TABLE_TYPE='VIEW'";*/
         $table_exists = db_query('select 1 from ipsc_wu_all_slots limit 1');
-        $this->emDebug('table_exists '. print_r($table_exists, true));
+        //$this->emDebug('table_exists '. print_r($table_exists, true));
         // this worked on local set up but not on production -- had to have table and views explicitly
         // created by redcap team
         if (empty($table_exists)) {
@@ -112,10 +112,11 @@ and TABLE_TYPE='VIEW'";*/
 
     public function getFreezerSpace($freezerId, $numSlots)
     {
-        $this->emDebug('numSlots = ' . $numSlots);
         if (!$numSlots) return;
         if ($numSlots > 5) {
-            $sql = "select box from ipsc_wu_all_slots where box like '" . strtolower($freezerId) . "%' and box not in (select box from ipsc_wu_used_" . strtolower($freezerId) . ") limit 1";
+            $sql = "select distinct box from ipsc_wu_all_slots where box like '"
+                . strtolower($freezerId) . "%' and box not in (select box from ipsc_wu_used_"
+                . strtolower($freezerId) . ") order by box limit 1";
             $this->emDebug('getFreezerSpace $sql ' . $sql);
             $result1 = db_query($sql);
             $row = db_fetch_assoc($result1);
@@ -134,7 +135,7 @@ and TABLE_TYPE='VIEW'";*/
             if (!$freezer) {
                 $emptySlots = array();
                 for ($slot = 1; $slot <= $numSlots; $slot++) {
-                    $emptySlots[] = $slot;
+                    $emptySlots[] = str_pad($slot, 3, '0', STR_PAD_LEFT);
                 }
                 $freezer = array();
                 $freezer['box'] = $emptyBox;
@@ -143,8 +144,11 @@ and TABLE_TYPE='VIEW'";*/
             return $freezer;
         } else {
             $sql = "select box, used_slots, used_slots_csv from ipsc_wu_used_"
-                . strtolower($freezerId)
-                . " where used_slots <" . (100 - $numSlots) . ' order by box limit 1';
+                . strtolower($freezerId)." where used_slots < " . (100 - $numSlots)
+                . " UNION select distinct box, 0, '' from ipsc_wu_all_slots "
+                ."where box not in (select box from ipsc_wu_used_"
+                . strtolower($freezerId).") order by box limit 1";
+
             $this->emDebug('getFreezerSpace $sql ' . $sql);
             return $this->allocateFreezerSpace($sql, $freezerId, $numSlots, false);
         }
@@ -175,7 +179,8 @@ and TABLE_TYPE='VIEW'";*/
     {
         $result1 = db_query($used_sql);
         // if there are no results, this means either all no freezer boxes have space or
-        // no freezer boxes have been allocated.
+        // maybe there is no contiguous space for allocations >= 5?
+        // TBD: 5/18/2021 this needs to be fixed
         if ($result1->num_rows === 0) {
             return $this->getSlotsIfEmpty($freezerId, $numSlots);
         }
@@ -229,11 +234,12 @@ and TABLE_TYPE='VIEW'";*/
             $r_result = db_query($sql);
             $row = db_fetch_assoc($r_result);
 
-            $this->emDebug('sql: ' . $sql . ' $row: ' . print_r($row, true));
+            //$this->emDebug('sql: ' . $sql . ' $row: ' . print_r($row, true));
             if ($row['num'] == 0) $continue = false;
-            $this->emDebug('$continue: ' . $continue);
+            //$this->emDebug('$continue: ' . $continue);
 
         }
+        $this->emDebug('new vialid: V' . $vialId);
         return 'V' . $vialId;
     }
 
@@ -347,7 +353,7 @@ and TABLE_TYPE='VIEW'";*/
         parent::redcap_save_record($project_id, $record, $instrument, $event_id, $group_id, $survey_hash,
             $response_id, $repeat_instance);
         if ($instrument == 'sample') {
-            $this->emDebug("repeat_instance: $repeat_instance record: $record getinstance=".$_GET['instance']);
+            //$this->emDebug("repeat_instance: $repeat_instance record: $record getinstance=".$_GET['instance']);
             $sample_data_array = REDCap::getData(PROJECT_ID, 'array',
                 $record, ['smp_new', 'smp_a', 'smp_b', 'smp_d'], null, null, false, false, false,
                 "['redcap_repeat_instance']=" . $repeat_instance,);
@@ -355,7 +361,7 @@ and TABLE_TYPE='VIEW'";*/
             $instance_results = $sample_data_array[$record]['repeat_instances'][$event_id][$instrument][$repeat_instance];
 
             if ($instance_results['smp_new']) {
-                $this->emDebug('save instance_array: ' . print_r($instance_results, true));
+                //$this->emDebug('save instance_array: ' . print_r($instance_results, true));
                 $vials = $this->saveNewVials($record, $repeat_instance,
                         $instance_results['smp_a'],
                         $instance_results['smp_b'], $instance_results['smp_d']);
@@ -1125,7 +1131,7 @@ and TABLE_TYPE='VIEW'";*/
           " GROUP BY rd.record, vial_instance) t ) vial
         ON sample.red_rec_number=vial.red_rec_number AND vial_sample_ref = sample_instance )
         ORDER BY freezer_box desc, freezer_slot desc";
-        $this->emDebug("print query sql: " .$sql);
+        //$this->emDebug("print query sql: " .$sql);
 
         $result = db_query($sql);
         if (!$result || $result->num_rows === 0) {
@@ -1148,11 +1154,11 @@ and TABLE_TYPE='VIEW'";*/
         }
         $print_data='';
         while ($row = db_fetch_assoc($result)) {
-            $this->emDebug('row ' . print_r($row, true));
+            //$this->emDebug('row ' . print_r($row, true));
             $sample_date = date_create($row['sample_date']);
-            $print_data.="^XA^FO$hoffset,$voffset^A0N,18^FD".date_format($sample_date, 'm/d/Y')."^FS";
-            $print_data.="^FO$hoffset,".($voffset + 19)."^A0N,18^FDExternal ID ".$row['record']."^FS";
-            $print_data.="^FO$hoffset,".($voffset + 39)."^A0N,18^FD".$row['freezer_box']."-".$row['freezer_slot']."^FS";
+            $print_data.="^XA^FO$hoffset,$voffset^A0N,20^FD".date_format($sample_date, 'm/d/Y')."^FS";
+            $print_data.="^FO$hoffset,".($voffset + 19)."^A0N,20^FDExternal ID ".$row['record']."^FS";
+            $print_data.="^FO$hoffset,".($voffset + 39)."^A0N,20^FD".$row['freezer_box']."-".$row['freezer_slot']."^FS";
             $desc ='';
             if (strpos($row['type'],'Fibroblast') !== false) {
                 $desc='fb';
@@ -1167,10 +1173,10 @@ and TABLE_TYPE='VIEW'";*/
             if (!empty($row['passage'])) {
                 $desc .=" P".$row['passage'];
             }
-            $print_data.="^FO$hoffset,".($voffset + 58)."^A0N,18^FD".$desc."^FS";
-            $print_data.="^FO$hoffset,".($voffset + 77)."^A0N,18^FD".$row['vial_id']."^FS";
+            $print_data.="^FO$hoffset,".($voffset + 58)."^A0N,20^FD".$desc."^FS";
+            $print_data.="^FO$hoffset,".($voffset + 77)."^A0N,20^FD".$row['vial_id']."^FS";
             // Code 128 Bar code
-            $print_data.="^FO$hoffset,".($voffset + 96)."^BCN,35,N,N,N,A^FD".$row['vial_id']."^FS";
+            $print_data.="^FO$hoffset,".($voffset + 96)."^BY1^BCN,35,N,N,N,A^FD".$row['vial_id']."^FS";
             $print_data.="^XZ";
         }
         $this->emDebug("ZPL:" . $print_data);

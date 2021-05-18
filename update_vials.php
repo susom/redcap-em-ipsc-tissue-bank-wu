@@ -40,7 +40,7 @@ try {
         if (strpos($record, "'") === -1 && strpos($record, '"') === -1) {
             $record = "'".$record."'";
         }
-        $sql = "select instance from redcap_data where project_id=" . PROJECT_ID .
+        $sql = "select COALESCE(instance,1) from redcap_data where project_id=" . PROJECT_ID .
             " and record=" . $record .
             " and field_name ='vial_dist_status'" .
             " and value ='2'".
@@ -89,7 +89,7 @@ try {
         global $module;
 
         $sql="select distinct COALESCE (sample.red_rec_number,'') `record`,
-            COALESCE (vial.vial_instance,'') `instance`,
+            COALESCE (vial.vial_instance,1) `instance`,
             COALESCE (sample.smp_date_deposited,'') `sample_date`,
             COALESCE (sample.smp_line_id,'') `line`,
 
@@ -206,7 +206,7 @@ try {
     else if ($_POST['updateType'] == 'distribute') {
         $matches = getRecordIds();
         $updateValues = json_decode($_POST['updateData'], true);
-        $module->emDebug('distribute values: ' . print_r($updateValues, true));
+        //$module->emDebug('distribute values: ' . print_r($updateValues, true));
 
         $jsonData = [];
         foreach($matches['instance'] as $instance) {
@@ -223,7 +223,7 @@ try {
         }
         $module->emDebug('$jsonData values: ' . '['.implode(',',$jsonData).']');
         $result = REDCap::saveData(PROJECT_ID, 'json','['.implode(',',$jsonData).']','overwrite');
-        $module->emDebug('$result values: ' . print_r($result, true));
+        //$module->emDebug('$result values: ' . print_r($result, true));
 
         if (count($result['errors'])) {
             $result['success']=false;
@@ -234,13 +234,13 @@ try {
     }
     else if ($_POST['updateType'] == 'move') {
         $matches = getRecordIds();
-        $module->emDebug('matches: ' . print_r($matches, true));
-        $sql = "select instance from redcap_data where project_id=" . PROJECT_ID .
+        //$module->emDebug('matches: ' . print_r($matches, true));
+        $sql = "select COALESCE(instance,1) from redcap_data where project_id=" . PROJECT_ID .
             " and record=" . $matches['record'][0] .
             " and field_name ='vial_dist_status'" .
             " and value ='2'" .
             " and COALESCE(instance,1) in (" . implode(',', $matches['instance']) . ")" ;
-        $module->emDebug('cancel query sql: ' . $sql);
+        //$module->emDebug('move query sql: ' . $sql);
 
         $result1 = db_query($sql);
         if ($result1->num_rows > 0) {
@@ -320,7 +320,6 @@ try {
     }
     else if ($_POST['updateType'] == 'emptySlotReport') {
         $freezer=$_POST['freezer'];
-        $module->emDebug('emptySlotReport');
         $sql = "select box, count(slot) as num_slots, group_concat(slot order by slot) as empty_slots " .
             "from ipsc_wu_all_slots where box like '$freezer%' AND (box, slot) not in (".
             "select distinct COALESCE (vial.box,'') `box`, "
@@ -337,15 +336,15 @@ try {
             "WHERE  rd.project_id = ".PROJECT_ID." GROUP BY rd.record, vial_instance) t    ".
             "WHERE status <> '2'  and box like '$freezer%') vial )".
             " group by box order by box";
-        $module->emDebug("empty slot sql=$sql ");
+        //$module->emDebug("empty slot sql=$sql ");
         $result = db_query($sql);
 
         $returnData = [];
         while ($row = db_fetch_assoc($result)) {
-            $module->emDebug('row ' . print_r($row, true));
+            //$module->emDebug('row ' . print_r($row, true));
             $returnData[] = $row;
         }
-        $module->emDebug('$returnData ' . json_encode($returnData));
+        //$module->emDebug('$returnData ' . json_encode($returnData));
 
         echo '{"success":true, "tableValues":' . json_encode($returnData) . '}';
     }
@@ -353,9 +352,8 @@ try {
         echo json_encode(getPlanned());
     }
     else if ($_POST['updateType']=="saveShipped") {
-        $module->emDebug('saveShipped');
         $recordsToSave = json_decode($_POST['recordsToSave'], true);
-        $module->emDebug('recordsToSave: '. print_r($recordsToSave, true));
+        //$module->emDebug('recordsToSave: '. print_r($recordsToSave, true));
         $jsonData = [];
         foreach($recordsToSave as $record) {
             $json ='{"red_rec_number":"'.$record['record'].'",';
@@ -374,10 +372,9 @@ try {
 
     }
     else if ($_POST['updateType']=='moveReport') {
-        $module->emDebug('moveReport');
 
         $sql="select distinct COALESCE (sample.red_rec_number,'') `record`,
-            COALESCE (vial.vial_instance,'') `instance`,
+            COALESCE (vial.vial_instance,1) `instance`,
             COALESCE (sample.smp_date_deposited,'') `deposit_date`,
             COALESCE (sample.smp_line_id,'') `line`,
             COALESCE (vial.vial_id,'') `vial_id`,
@@ -423,13 +420,12 @@ try {
         ON sample.red_rec_number=vial.red_rec_number AND vial_sample_ref = sample_instance )";
 
         $result = db_query($sql);
-        $module->emDebug('$sql ' . $sql);
-
-        $module->emDebug('$result ' . print_r($result, true));
+        //$module->emDebug('$sql ' . $sql);
+        //$module->emDebug('$result ' . print_r($result, true));
 
         $returnData = [];
         while ($row = db_fetch_assoc($result)) {
-            $module->emDebug('row ' . print_r($row, true));
+            //$module->emDebug('row ' . print_r($row, true));
             $returnData[] = $row;
         }
         $module->emDebug('$returnData ' . json_encode($returnData));
