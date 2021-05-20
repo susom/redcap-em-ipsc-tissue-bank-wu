@@ -29,8 +29,7 @@ try {
         $module->emDebug('matches: ' . $_POST['tablehtml']);
 
         preg_match_all(
-            "/editInstance\((?P<record>.*?),(?P<event_id>.*?),(?P<instrument>.*?),(?P<instance>.*?)\).*?>(?P<vialid>
-            .*?)<\/a>.*?<\/td><td.*?>(?P<box>.*?)<\/td><td>(?P<slot>.*?)<\/td><\/tr>/",
+            "/editInstance\((?P<record>.*?),(?P<event_id>.*?),(?P<instrument>.*?),(?P<instance>.*?)\).*?>(?P<vialid>.*?)<\/a>.*?<\/td><td.*?>(?P<box>.*?)<\/td><td>(?P<slot>.*?)<\/td><\/tr>/",
             $_POST['tablehtml'], $matches);
         $module->emDebug('matches: ' . print_r($matches, true));
         return $matches;
@@ -281,8 +280,7 @@ try {
         foreach($recordsToSave as $record) {
             $instances = [];
             $instances[]=$record['instance'];
-            $returnData = $module->printLabels($record['record'], $instances);
-            $returnData['data'] .= printLabels($record['record'], $instances);
+            $returnData['data'] .= $module->printLabels($record['record'], $instances);
             /*if ($returnData['success']==false) {
                 break;
             }*/
@@ -421,8 +419,8 @@ try {
         ON sample.red_rec_number=vial.red_rec_number AND vial_sample_ref = sample_instance )";
 
         $result = db_query($sql);
-        //$module->emDebug('$sql ' . $sql);
-        //$module->emDebug('$result ' . print_r($result, true));
+        $module->emDebug('$sql ' . $sql);
+        $module->emDebug('$result ' . print_r($result, true));
 
         $returnData = [];
         while ($row = db_fetch_assoc($result)) {
