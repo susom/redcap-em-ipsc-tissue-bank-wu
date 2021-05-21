@@ -144,7 +144,7 @@ and TABLE_TYPE='VIEW'";*/
             return $freezer;
         } else {
             $sql = "select box, used_slots, used_slots_csv from ipsc_wu_used_"
-                . strtolower($freezerId)." where used_slots < " . (100 - $numSlots)
+                . strtolower($freezerId)." where used_slots <= " . (100 - $numSlots)
                 . " UNION select distinct box, 0, '' from ipsc_wu_all_slots "
                 ."where box like '".$freezerId."%' and box not in (select box from ipsc_wu_used_"
                 . strtolower($freezerId).") order by box limit 1";
