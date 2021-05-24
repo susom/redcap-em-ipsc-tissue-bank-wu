@@ -115,7 +115,7 @@ and TABLE_TYPE='VIEW'";*/
         if (!$numSlots) return;
         if ($numSlots > 5) {
             $sql = "select distinct box from ipsc_wu_all_slots where box like '"
-                . strtolower($freezerId) . "%' and box not in (select box from ipsc_wu_used_"
+                . $freezerId . "%' and box not in (select box from ipsc_wu_used_"
                 . strtolower($freezerId) . ") order by box limit 1";
             $this->emDebug('getFreezerSpace $sql ' . $sql);
             $result1 = db_query($sql);
