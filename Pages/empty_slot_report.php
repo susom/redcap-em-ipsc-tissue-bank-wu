@@ -29,48 +29,57 @@ $module->emDebug('empty slot report url ' . $url);
       <script type="text/javascript">
 
         $(document).ready(function () {
-          document.getElementById('tankId').addEventListener('change',
+          document.getElementById('submit').addEventListener('click',
             function() {
-              document.getElementById('messages').style.color = 'black';
-              document.getElementById('messages').innerHTML =
-                'Please be patient, this report may take several minutes to  load   <i class="fas fa-spinner ' +
-                'fa-spin"></i> <br>';
               let selectVal = document.getElementById('tankId').value;
-              var url = '<?php echo $url; ?>';
+              let boxVal = document.getElementById('box').value;
+              if (selectVal) {
+                document.getElementById('messages').style.color = 'black';
+                document.getElementById('messages').innerHTML =
+                  'Please be patient, this report may take several minutes to  load   <i class="fas fa-spinner ' +
+                  'fa-spin"></i> <br>';
+                var url = '<?php echo $url; ?>';
+                $.ajax({
+                  type: "POST",
+                  url: url,
+                  timeout: 0,
+                  data: {"updateType": "emptySlotReport", "freezer": selectVal, "box": boxVal},
+                  dataType: 'json',
+                  success: function (data) {
+                    if (data.tableValues.length > 0) {
+                      try {
+                        var table_html = '<table class="table table-bordered table-striped"><thead>'
+                          + '<tr><th>Freezer Box</th><th>Available Slots</th><th>Slots</th></tr></thead><tbody>';
+                        for (var i = 0; i < data.tableValues.length; i++) {
+                          table_html += "<tr><td>" + data.tableValues[i].box + "</td>";
+                          table_html += "<td>" + data.tableValues[i].num_slots + "</td>";
+                          table_html += "<td>" + data.tableValues[i].empty_slots + "</td></tr>";
+                        }
+                        table_html += "</tbody></table>";
+                        document.getElementById('messages').innerHTML = table_html;
 
-              $.ajax({
-                type: "POST",
-                url: url,
-                timeout: 0,
-                data: {"updateType":"emptySlotReport","freezer":selectVal},
-                dataType: 'json',
-                success: function (data) {
-                  try {
-                    var table_html = '<table class="table table-bordered table-striped"><thead>'
-                      +'<tr><th>Freezer Box</th><th>Available Slots</th><th>Slots</th></tr></thead><tbody>';
-                    for (var i=0; i<data.tableValues.length; i++) {
-                      table_html += "<tr><td>" + data.tableValues[i].box + "</td>";
-                      table_html += "<td>" + data.tableValues[i].num_slots + "</td>";
-                      table_html += "<td>" + data.tableValues[i].empty_slots + "</td></tr>";
+                      } catch (error) {
+                        document.getElementById('messages').style.color = 'red';
+                        document.getElementById('messages').innerHTML = data;
+                      }
+                    } else {
+                      document.getElementById('messages').style.color = 'black';
+                      document.getElementById('messages').innerHTML =
+                        'The selected box does not exist.';
                     }
-                    table_html += "</tbody></table>";
-                    document.getElementById('messages').innerHTML = table_html;
-
-                  } catch (error) {
-                    document.getElementById('messages').style.color = 'red';
-                    document.getElementById('messages').innerHTML = data;
+                  },
+                  error: function (request, error) {
+                    console.log('Request ' + request);
+                    console.log('Error ' + error);
                   }
-                },
-                error: function (request, error) {
-                  console.log('Request ' + request);
-                  console.log('Error ' + error);
-                }
-              });
+                });
+              } else {
+                document.getElementById('messages').style.color = 'red';
+                document.getElementById('messages').innerHTML =
+                  '<h5>Select a freezer value.</h5>';
+              }
             }
           );
-
-
-
         });
 
       </script>
@@ -86,12 +95,17 @@ $module->emDebug('empty slot report url ' . $url);
   <label class="col-form-label" for="tankId">Freezer:&nbsp;</label> <select class="form-control col-3" id="tankId">
       <option hidden disabled selected value> -- select an option -- </option>
       <option>A</option>
-    <option>B</option>
-    <option>D</option>
+      <option>B</option>
+      <option>D</option>
   </select>
+    <label class="col-form-label ml-3" for="box">Box (Optional):&nbsp;</label>
+    <input type="text" id="box">
+  </div>  <div class="form-row">
+  <button type="button" id="submit" class="btn btn-primary mt-3">Submit</button>
   </div>
+
 </form>
-    <div id="messages">
+    <div id="messages" class="mt-3">
     </div>
 </body>
 

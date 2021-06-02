@@ -319,6 +319,10 @@ try {
     }
     else if ($_POST['updateType'] == 'emptySlotReport') {
         $freezer=$_POST['freezer'];
+        if (strlen($_POST['box']) > 0) {
+            $freezer = $freezer . str_pad($_POST['box'], 4,
+                    '0', STR_PAD_LEFT);
+        }
         $sql = "select box, count(slot) as num_slots, group_concat(slot order by slot) as empty_slots " .
             "from ipsc_wu_all_slots where box like '$freezer%' AND (box, slot) not in (".
             "select distinct COALESCE (vial.box,'') `box`, "
