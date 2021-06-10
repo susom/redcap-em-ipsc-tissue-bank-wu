@@ -29,7 +29,7 @@ try {
         $module->emDebug('matches: ' . $_POST['tablehtml']);
 
         preg_match_all(
-            "/editInstance\((?P<record>.*?),(?P<event_id>.*?),(?P<instrument>.*?),(?P<instance>.*?)\).*?>(?P<vialid>.*?)<\/a>.*?<\/td><td.*?>(?P<box>.*?)<\/td><td>(?P<slot>.*?)<\/td><\/tr>/",
+            "/editInstance\((?P<record>.*?),(?P<event_id>.*?),(?P<instrument>.*?),(?P<instance>.*?)\).*?>(?P<vialid>.*?)<\/a>.*?<\/td><td.*?>(?P<box>.*?)<\/td><td.*?>(?P<slot>.*?)<\/td><\/tr>/",
             $_POST['tablehtml'], $matches);
         $module->emDebug('matches: ' . print_r($matches, true));
         return $matches;
