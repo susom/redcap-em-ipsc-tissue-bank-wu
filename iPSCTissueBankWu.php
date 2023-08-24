@@ -175,8 +175,9 @@ and TABLE_TYPE='VIEW'";*/
         return false;
     }
 
-    public function allocateFreezerSpace($used_sql, $freezerId, $numSlots, $consecutive = false)
+    public function allocateFreezerSpace($used_sql, $freezerId, $numSlots, $consecutive)
     {
+      $consecutive = (isset($consecutive) ? $consecutive : false);
         $result1 = db_query($used_sql);
         // if there are no results, this means either all no freezer boxes have space or
         // maybe there is no contiguous space for allocations >= 5?
@@ -344,11 +345,12 @@ and TABLE_TYPE='VIEW'";*/
                     'Print');";
     }
 
-    public function redcap_save_record($project_id, $record=null, $instrument,
-           $event_id, $group_id = null, $survey_hash = null,
-           $response_id = null, $repeat_instance=1) {
+    public function redcap_save_record($project_id, $record, $instrument,
+           $event_id, $group_id, $survey_hash, $response_id, $repeat_instance) {
         if (!empty($_GET['instance'])) {
             $repeat_instance=$_GET['instance'];
+        } else {
+          $repeat_instance = 1;
         }
         parent::redcap_save_record($project_id, $record, $instrument, $event_id, $group_id, $survey_hash,
             $response_id, $repeat_instance);

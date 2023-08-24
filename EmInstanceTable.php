@@ -24,6 +24,7 @@ class EmInstanceTable extends AbstractExternalModule
     protected $user_rights;
     protected $event_id;
     protected $record;
+    protected $instrument;
     protected $instance;
     protected $group_id;
     protected $repeat_instance;
@@ -72,7 +73,7 @@ class EmInstanceTable extends AbstractExternalModule
         $this->pageTop();
     }
 
-    public function redcap_save_record($project_id, $record = null, $instrument, $event_id, $group_id = null, $survey_hash = null, $response_id = null, $repeat_instance = 1)
+    public function redcap_save_record($project_id, $record, $instrument, $event_id, $group_id, $survey_hash, $response_id, $repeat_instance)
     {
         // if saving an instance in the popup, get &extmod_instance_table=1 into the redirect link e.g. when missing required fields found
         if (isset($_GET['extmod_instance_table']) && $_GET['extmod_instance_table'] == '1') {
@@ -80,7 +81,7 @@ class EmInstanceTable extends AbstractExternalModule
         }
     }
 
-    protected function initHook($record, $instrument, $event_id, $isSurvey = false, $group_id, $repeat_instance)
+    protected function initHook($record, $instrument, $event_id, $isSurvey, $group_id, $repeat_instance)
     {
         $this->record = $record;
         $this->instrument = $instrument;
@@ -312,8 +313,9 @@ class EmInstanceTable extends AbstractExternalModule
         return $html;
     }
 
-    public function getInstanceData($record, $event, $form, $filter, $includeFormStatus = true)
+    public function getInstanceData($record, $event, $form, $filter, $includeFormStatus)
     {
+      $includeFormStatus = (isset($includeFormStatus) ? $includeFormStatus : true);
         $instanceData = array();
 
         $repeatingFormFields = REDCap::getDataDictionary('array', false, null, $form);
@@ -360,7 +362,8 @@ class EmInstanceTable extends AbstractExternalModule
 
                     } else if ($fieldType === 'text') {
                         $ontologyOption = $this->Proj->metadata[$fieldName]['element_enum'];
-                        if ($ontologyOption !== '' && preg_match('/^\w+:\w+$/', $ontologyOption)) {
+                        if (isset($ontologyOption) && $ontologyOption !== ''
+                            && preg_match('/^\w+:\w+$/', $ontologyOption)) {
                             // ontology fields are text fields with an element enum like "BIOPORTAL:ICD10"
                             list($ontologyService, $ontologyCategory) = explode(':', $ontologyOption, 2);
                             $outValue = $this->makeOntologyDisplay($value, $ontologyService, $ontologyCategory);
@@ -509,7 +512,6 @@ class EmInstanceTable extends AbstractExternalModule
           var langNo = '<?php echo js_escape($this->lang['design_99']);?>';
           var config = <?php echo json_encode($this->taggedFields, JSON_PRETTY_PRINT);?>;
           var taggedFieldNames = [];
-          var defaultValueForNewPopup = '<?php echo js_escape($this->defaultValueForNewPopup);?>';
 
           function init() {
             config.forEach(function (taggedField) {
