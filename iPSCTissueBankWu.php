@@ -47,8 +47,10 @@ and TABLE_TYPE='VIEW'";*/
             $this->emDebug('create ipsc_wu_all_slots '.$sql);
             db_query($sql);
             $freezers = ['A', 'B', 'D'];
+            $data_table = method_exists('\REDCap', 'getDataTable') ? \REDCap::getDataTable(PROJECT_ID) : "redcap_data";
+
             foreach ($freezers as $freezer) {
-                $sql = "CREATE OR REPLACE VIEW ipsc_wu_used_" . strtolower($freezer) ." AS SELECT DISTINCT vial.vial_freezer_box `box`, COUNT(vial.vial_freezer_slot) AS `used_slots`, GROUP_CONCAT( vial.vial_freezer_slot ORDER BY vial.vial_freezer_slot) AS `used_slots_csv` FROM ( SELECT * FROM ( SELECT rd.record red_rec_number, COALESCE(rd.`instance`, 1) AS vial_instance, GROUP_CONCAT( DISTINCT CASE WHEN rd.field_name = 'vial_freezer_box' THEN rd.value END SEPARATOR '\\n') `vial_freezer_box`, GROUP_CONCAT( DISTINCT CASE WHEN rd.field_name = 'vial_freezer_slot' THEN rd.value END SEPARATOR '\\n') `vial_freezer_slot`, GROUP_CONCAT( DISTINCT CASE WHEN rd.field_name = 'vial_dist_status' THEN rd.value END SEPARATOR '\\n') `vial_dist_status` FROM redcap_data rd WHERE rd.project_id = " . PROJECT_ID ." GROUP BY rd.record, vial_instance) t WHERE vial_dist_status IN('0', '1') AND vial_freezer_box LIKE '" . $freezer . "%' " .") vial GROUP BY vial_freezer_box ORDER BY vial_freezer_box";
+                $sql = "CREATE OR REPLACE VIEW ipsc_wu_used_" . strtolower($freezer) ." AS SELECT DISTINCT vial.vial_freezer_box `box`, COUNT(vial.vial_freezer_slot) AS `used_slots`, GROUP_CONCAT( vial.vial_freezer_slot ORDER BY vial.vial_freezer_slot) AS `used_slots_csv` FROM ( SELECT * FROM ( SELECT rd.record red_rec_number, COALESCE(rd.`instance`, 1) AS vial_instance, GROUP_CONCAT( DISTINCT CASE WHEN rd.field_name = 'vial_freezer_box' THEN rd.value END SEPARATOR '\\n') `vial_freezer_box`, GROUP_CONCAT( DISTINCT CASE WHEN rd.field_name = 'vial_freezer_slot' THEN rd.value END SEPARATOR '\\n') `vial_freezer_slot`, GROUP_CONCAT( DISTINCT CASE WHEN rd.field_name = 'vial_dist_status' THEN rd.value END SEPARATOR '\\n') `vial_dist_status` FROM $data_table rd WHERE rd.project_id = " . PROJECT_ID ." GROUP BY rd.record, vial_instance) t WHERE vial_dist_status IN('0', '1') AND vial_freezer_box LIKE '" . $freezer . "%' " .") vial GROUP BY vial_freezer_box ORDER BY vial_freezer_box";
                 db_query($sql);
                 $this->emDebug('create ipsc_wu_used_' . strtolower($freezer) .' '. $sql);
 
@@ -229,8 +231,10 @@ and TABLE_TYPE='VIEW'";*/
             for ($i = 0; $i < 11; $i++) {
                 $vialId .= rand(0, 9);
             }
+            $data_table = method_exists('\REDCap', 'getDataTable') ? \REDCap::getDataTable(PROJECT_ID) : "redcap_data";
+
             // original code uses an ipsc_vial_number table for this.  necessary?
-            $sql = "SELECT count(1) as num from redcap_data where project_id=" . PROJECT_ID .
+            $sql = "SELECT count(1) as num from $data_table where project_id=" . PROJECT_ID .
                 " and field_name='vial_id' and value='V" . $vialId . "'";
             $r_result = db_query($sql);
             $row = db_fetch_assoc($r_result);
@@ -262,8 +266,10 @@ and TABLE_TYPE='VIEW'";*/
 
     public function saveNewVials($record, $sample, $numA, $numB, $numD)
     {
+        $data_table = method_exists('\REDCap', 'getDataTable') ? \REDCap::getDataTable(PROJECT_ID) : "redcap_data";
+
         // get max vial instance for this record and vial ID
-        $sql = "SELECT max(COALESCE(instance,1)) as max_instance from redcap_data where project_id=" . PROJECT_ID
+        $sql = "SELECT max(COALESCE(instance,1)) as max_instance from $data_table where project_id=" . PROJECT_ID
             . " and record='" . $record . "' and field_name='vial_id'";
         //$this->emDebug('max instance $sql is ' . $sql);
         $result1 = db_query($sql);
@@ -1088,6 +1094,8 @@ and TABLE_TYPE='VIEW'";*/
 
     function printLabels($record, $instances) {
         $return = [];
+        $data_table = method_exists('\REDCap', 'getDataTable') ? \REDCap::getDataTable(PROJECT_ID) : "redcap_data";
+
         $sql="select distinct COALESCE (sample.red_rec_number,'') `record`,
             COALESCE (sample.sample_instance,'') `instance`,
             COALESCE (sample.smp_date_deposited,'') `sample_date`,
@@ -1110,7 +1118,7 @@ and TABLE_TYPE='VIEW'";*/
                 then rd.value end separator '\\n') `smp_passage_number`,
             group_concat(distinct case when rd.field_name = 'smp_line_id'
                 then rd.value end separator '\\n') `smp_line_id`
-      FROM redcap_data rd JOIN redcap_metadata md
+      FROM $data_table rd JOIN redcap_metadata md
           ON md.project_id = rd.project_id
              AND md.field_name = rd.field_name AND md.form_name='sample'
       WHERE rd.project_id = ".PROJECT_ID.
@@ -1126,7 +1134,7 @@ and TABLE_TYPE='VIEW'";*/
             then rd.value end separator '\\n') `vial_freezer_box`,
         group_concat(distinct case when rd.field_name = 'vial_freezer_slot'
             then rd.value end separator '\\n') `vial_freezer_slot`
-      FROM redcap_data rd
+      FROM $data_table rd
       WHERE rd.project_id = ".PROJECT_ID.
             " AND rd.record = " . $record .
             " AND COALESCE(rd.instance,1) in (" . implode(",", $instances).")".

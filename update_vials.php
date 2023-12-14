@@ -13,6 +13,7 @@ try {
         throw new LogicException('You cant be here');
     }
     $module->emDebug('$_POST: ' . print_r($_POST, true));
+    $data_table = method_exists('\REDCap', 'getDataTable') ? \REDCap::getDataTable($module->getProjectId()) : "redcap_data";
 
     if (!isset($_POST['updateType'])) {
         throw new LogicException('An update type is required');
@@ -37,10 +38,12 @@ try {
 
     function cancelPlanned($record, $instances) {
         global $module;
+        $data_table = method_exists('\REDCap', 'getDataTable') ? \REDCap::getDataTable(PROJECT_ID) : "redcap_data";
+
         if (strpos($record, "'") === -1 && strpos($record, '"') === -1) {
             $record = "'".$record."'";
         }
-        $sql = "select COALESCE(instance,1) from redcap_data where project_id=" . PROJECT_ID .
+        $sql = "select COALESCE(instance,1) from $data_table where project_id=" . PROJECT_ID .
             " and record=" . $record .
             " and field_name ='vial_dist_status'" .
             " and value ='2'".
@@ -87,6 +90,7 @@ try {
 
     function getPlanned() {
         global $module;
+        $data_table = method_exists('\REDCap', 'getDataTable') ? \REDCap::getDataTable(PROJECT_ID) : "redcap_data";
 
         $sql="select distinct COALESCE (sample.red_rec_number,'') `record`,
             COALESCE (vial.vial_instance,1) `instance`,
@@ -117,7 +121,7 @@ try {
                 then rd.value end separator '\\n') `smp_passage_number`,
             group_concat(distinct case when rd.field_name = 'smp_line_id'
                 then rd.value end separator '\\n') `smp_line_id`
-      FROM redcap_data rd JOIN redcap_metadata md
+      FROM $data_table rd JOIN redcap_metadata md
           ON md.project_id = rd.project_id
              AND md.field_name = rd.field_name AND md.form_name='sample'
       WHERE rd.project_id = ".PROJECT_ID.
@@ -140,7 +144,7 @@ try {
             then rd.value end separator '\\n') `vial_dist_status`,
         group_concat(distinct case when rd.field_name = 'vial_dist_date'
             then rd.value end separator '\\n') `vial_dist_date`
-      FROM redcap_data rd
+      FROM $data_table rd
       WHERE rd.project_id = ".PROJECT_ID.
        " GROUP BY rd.record, vial_instance) t
         WHERE vial_dist_status = '1' ) vial
@@ -163,7 +167,7 @@ try {
     if ($_POST['updateType'] == 'delete') {
         $dataDictionary = REDCap::getDataDictionary(PROJECT_ID, 'array', false, null, 'vial');
         $matches = getRecordIds();
-        $sql = "delete from redcap_data where project_id=" . PROJECT_ID .
+        $sql = "delete from $data_table where project_id=" . PROJECT_ID .
             " and event_id =" . $matches['event_id'][0] .
             " and field_name in ('".implode("','",array_keys($dataDictionary))."','vial_complete')".
             " and record=" . $matches['record'][0] .
@@ -235,7 +239,7 @@ try {
     else if ($_POST['updateType'] == 'move') {
         $matches = getRecordIds();
         //$module->emDebug('matches: ' . print_r($matches, true));
-        $sql = "select COALESCE(instance,1) from redcap_data where project_id=" . PROJECT_ID .
+        $sql = "select COALESCE(instance,1) from $data_table where project_id=" . PROJECT_ID .
             " and record=" . $matches['record'][0] .
             " and field_name ='vial_dist_status'" .
             " and value ='2'" .
@@ -335,7 +339,7 @@ try {
             "group_concat(distinct case when rd.field_name = 'vial_freezer_slot'  ".
             "then rd.value end separator '\\n') `slot`, ".
             "group_concat(distinct case when rd.field_name = 'vial_dist_status'  ".
-            "then rd.value end separator '\\n') `status` FROM redcap_data rd ".
+            "then rd.value end separator '\\n') `status` FROM $data_table rd ".
             "WHERE  rd.project_id = ".PROJECT_ID." GROUP BY rd.record, vial_instance) t    ".
             "WHERE status <> '2'  and box like '$freezer%') vial )".
             " group by box order by box";
@@ -393,7 +397,7 @@ try {
                 then rd.value end separator '\\n') `smp_date_deposited`,
             group_concat(distinct case when rd.field_name = 'smp_line_id'
                 then rd.value end separator '\\n') `smp_line_id`
-      FROM redcap_data rd JOIN redcap_metadata md
+      FROM $data_table rd JOIN redcap_metadata md
           ON md.project_id = rd.project_id
              AND md.field_name = rd.field_name AND md.form_name='sample'
       WHERE rd.project_id = ".PROJECT_ID.
@@ -416,7 +420,7 @@ try {
             then rd.value end separator '\\n') `vial_dist_status`,
         group_concat(distinct case when rd.field_name = 'vial_move_date'
             then rd.value end separator '\\n') `vial_move_date`
-      FROM redcap_data rd
+      FROM $data_table rd
       WHERE rd.project_id = ".PROJECT_ID.
             " GROUP BY rd.record, vial_instance) t
         WHERE vial_dist_status <> '2' AND vial_prev_freezer_box <> '' ) vial
